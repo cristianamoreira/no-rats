@@ -1,10 +1,21 @@
 import { useState, useEffect } from 'react'
 
-const DIFFICULTIES = {
-  simples: { label: 'Simples', xp: 10, color: '#10b981' },
-  medio: { label: 'Médio', xp: 25, color: '#f59e0b' },
-  dificil: { label: 'Difícil', xp: 50, color: '#ef4444' },
+const FREQUENCIES = {
+  diaria: { label: 'Diária', days: 1, xp: 5 },
+  semanal: { label: 'Semanal', days: 7, xp: 15 },
+  quinzenal: { label: 'Quinzenal', days: 15, xp: 25 },
+  mensal: { label: 'Mensal', days: 30, xp: 40 },
 }
+
+const STARTERS = [
+  { title: 'Lavar a louça', freq: 'diaria' },
+  { title: 'Lavar roupa', freq: 'semanal' },
+  { title: 'Limpar o banheiro', freq: 'semanal' },
+  { title: 'Trocar a roupa de cama', freq: 'quinzenal' },
+  { title: 'Faxina geral', freq: 'mensal' },
+]
+
+const MS = 86400000
 
 function RatLogo() {
   return (
@@ -35,62 +46,126 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function daysSince(dateStr) {
+  if (!dateStr) return null
+  return Math.round((Date.parse(todayStr()) - Date.parse(dateStr)) / MS)
+}
+
+function getStatus(routine) {
+  const freq = FREQUENCIES[routine.freq] || FREQUENCIES.semanal
+  const ds = daysSince(routine.lastDone)
+
+  if (ds === null) {
+    return { kind: 'none', color: '#94a3b8', label: 'Sem registro', last: 'Nunca registrada', sort: -0.4 }
+  }
+
+  let last
+  if (ds === 0) last = 'Última vez: hoje'
+  else if (ds === 1) last = 'Última vez: ontem'
+  else last = `Última vez: há ${ds} dias`
+
+  if (ds < freq.days) {
+    const rem = freq.days - ds
+    return {
+      kind: 'ok',
+      color: '#10b981',
+      label: 'Em dia',
+      last,
+      sub: `Próxima em ${rem} ${rem === 1 ? 'dia' : 'dias'}`,
+      sort: -(rem),
+    }
+  }
+
+  const over = ds - freq.days
+  if (over === 0) {
+    return { kind: 'due', color: '#f59e0b', label: 'Vence hoje', last, sort: 0 }
+  }
+  return {
+    kind: 'late',
+    color: '#ef4444',
+    label: `Atrasada há ${over} ${over === 1 ? 'dia' : 'dias'}`,
+    last,
+    sort: over,
+  }
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem('norats')
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const s = JSON.parse(raw)
+      if (Array.isArray(s.routines)) return s
+    }
   } catch (e) {}
-  return { tasks: [], xp: 0, streak: 0, lastDay: null }
+  return {
+    routines: STARTERS.map((s, i) => ({ id: Date.now() + i, title: s.title, freq: s.freq, lastDone: null })),
+    xp: 0,
+    streak: 0,
+    lastDay: null,
+  }
 }
 
 export default function App() {
   const initial = loadState()
-  const [tasks, setTasks] = useState(initial.tasks)
+  const [routines, setRoutines] = useState(initial.routines)
   const [xp, setXp] = useState(initial.xp)
   const [streak, setStreak] = useState(initial.streak)
   const [lastDay, setLastDay] = useState(initial.lastDay)
   const [title, setTitle] = useState('')
-  const [difficulty, setDifficulty] = useState('simples')
+  const [freq, setFreq] = useState('semanal')
   const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    localStorage.setItem('norats', JSON.stringify({ tasks, xp, streak, lastDay }))
-  }, [tasks, xp, streak, lastDay])
+    localStorage.setItem('norats', JSON.stringify({ routines, xp, streak, lastDay }))
+  }, [routines, xp, streak, lastDay])
 
   const showToast = (msg) => {
     setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+    setTimeout(() => setToast(null), 2600)
   }
 
-  const createTask = () => {
-    if (!title.trim()) return showToast('✏️ Digite um título!')
-    const d = DIFFICULTIES[difficulty]
-    setTasks([...tasks, { id: Date.now(), title: title.trim(), xp: d.xp, difficulty }])
+  const addRoutine = () => {
+    if (!title.trim()) return showToast('✏️ Dê um nome para a rotina!')
+    setRoutines([...routines, { id: Date.now(), title: title.trim(), freq, lastDone: null }])
     setTitle('')
   }
 
-  const completeTask = (id) => {
-    const task = tasks.find((t) => t.id === id)
-    if (!task) return
-    const prevLevel = Math.floor(xp / 100) + 1
-    const newXp = xp + task.xp
-    const newLevel = Math.floor(newXp / 100) + 1
+  const markDone = (id) => {
+    const routine = routines.find((r) => r.id === id)
+    if (!routine) return
     const today = todayStr()
+
+    if (routine.lastDone === today) {
+      showToast('✨ Já registrada hoje!')
+      return
+    }
+
+    const reward = (FREQUENCIES[routine.freq] || FREQUENCIES.semanal).xp
+    const prevLevel = Math.floor(xp / 100) + 1
+    const newXp = xp + reward
+    const newLevel = Math.floor(newXp / 100) + 1
+
     if (lastDay !== today) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+      const yesterday = new Date(Date.now() - MS).toISOString().slice(0, 10)
       setStreak(lastDay === yesterday ? streak + 1 : 1)
       setLastDay(today)
     }
+
     setXp(newXp)
-    setTasks(tasks.filter((t) => t.id !== id))
+    setRoutines(routines.map((r) => (r.id === id ? { ...r, lastDone: today } : r)))
+
     if (newLevel > prevLevel) showToast(`🎉 LEVEL UP! Você chegou ao Nível ${newLevel}!`)
-    else showToast(`✅ +${task.xp} XP conquistado!`)
+    else showToast(`✅ Registrada! +${reward} XP`)
   }
 
-  const deleteTask = (id) => setTasks(tasks.filter((t) => t.id !== id))
+  const removeRoutine = (id) => setRoutines(routines.filter((r) => r.id !== id))
 
   const level = Math.floor(xp / 100) + 1
   const progress = ((xp % 100) / 100) * 100
+
+  const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
+  withStatus.sort((a, b) => b.status.sort - a.status.sort)
+  const attention = withStatus.filter((r) => r.status.kind === 'late' || r.status.kind === 'due').length
 
   return (
     <div className="nr-app">
@@ -103,7 +178,7 @@ export default function App() {
           <RatLogo />
         </div>
         <h1 className="nr-wordmark">No Rats</h1>
-        <p className="nr-tagline">Transforme suas tarefas domésticas em conquistas</p>
+        <p className="nr-tagline">O registro inteligente das tarefas da sua casa</p>
       </header>
 
       <main className="nr-container">
@@ -131,38 +206,41 @@ export default function App() {
           </div>
 
           <div className="nr-card nr-stat">
-            <div className="nr-chip" style={{ background: '#fce7f3' }}>📋</div>
-            <div className="nr-stat-val" style={{ color: '#db2777' }}>{tasks.length}</div>
-            <div className="nr-stat-label">Pendentes</div>
+            <div className="nr-chip" style={{ background: attention ? '#fee2e2' : '#dcfce7' }}>
+              {attention ? '⚠️' : '✅'}
+            </div>
+            <div className="nr-stat-val" style={{ color: attention ? '#ef4444' : '#10b981' }}>{attention}</div>
+            <div className="nr-stat-label">Precisam de atenção</div>
           </div>
         </section>
 
         <section className="nr-panel">
-          <h2 className="nr-h">Nova tarefa</h2>
+          <h2 className="nr-h">Nova rotina</h2>
           <div className="nr-row">
             <input
               className="nr-input"
               type="text"
-              placeholder="Ex: Lavar a louça, limpar o quarto…"
+              placeholder="Ex: Lavar as toalhas, regar as plantas…"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && createTask()}
+              onKeyPress={(e) => e.key === 'Enter' && addRoutine()}
             />
-            <button className="nr-btn nr-btn-primary" onClick={createTask}>
+            <button className="nr-btn nr-btn-primary" onClick={addRoutine}>
               Adicionar
             </button>
           </div>
+          <div className="nr-field-label">Com que frequência?</div>
           <div className="nr-pills">
-            {Object.entries(DIFFICULTIES).map(([key, d]) => {
-              const active = difficulty === key
+            {Object.entries(FREQUENCIES).map(([key, f]) => {
+              const active = freq === key
               return (
                 <button
                   key={key}
                   className="nr-pill"
-                  onClick={() => setDifficulty(key)}
-                  style={active ? { background: d.color, borderColor: d.color, color: '#fff' } : undefined}
+                  onClick={() => setFreq(key)}
+                  style={active ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}
                 >
-                  {d.label} · +{d.xp} XP
+                  {f.label} · +{f.xp} XP
                 </button>
               )
             })}
@@ -170,29 +248,40 @@ export default function App() {
         </section>
 
         <section>
-          <h2 className="nr-list-title">Minhas tarefas · {tasks.length}</h2>
-          {tasks.length === 0 ? (
+          <h2 className="nr-list-title">Minhas rotinas · {routines.length}</h2>
+          {routines.length === 0 ? (
             <div className="nr-empty">
               <div style={{ fontSize: '34px', marginBottom: '8px' }}>🧹</div>
-              Tudo limpo por aqui! Adicione sua primeira tarefa acima.
+              Nenhuma rotina ainda. Adicione a primeira acima!
             </div>
           ) : (
             <div className="nr-tasks">
-              {tasks.map((task) => {
-                const d = DIFFICULTIES[task.difficulty] || DIFFICULTIES.simples
+              {withStatus.map((r) => {
+                const f = FREQUENCIES[r.freq] || FREQUENCIES.semanal
+                const s = r.status
+                const doneToday = r.lastDone === todayStr()
                 return (
-                  <div className="nr-task" key={task.id} style={{ borderLeftColor: d.color }}>
+                  <div className="nr-task" key={r.id} style={{ borderLeftColor: s.color }}>
                     <div style={{ minWidth: 0 }}>
-                      <div className="nr-task-title">{task.title}</div>
-                      <span className="nr-badge" style={{ background: d.color }}>
-                        {d.label} · +{task.xp} XP
-                      </span>
+                      <div className="nr-task-head">
+                        <span className="nr-task-title">{r.title}</span>
+                        <span className="nr-status" style={{ background: s.color }}>
+                          {s.label}
+                        </span>
+                      </div>
+                      <div className="nr-meta">
+                        {s.last} · {f.label}
+                        {s.sub ? ` · ${s.sub}` : ''}
+                      </div>
                     </div>
                     <div className="nr-actions">
-                      <button className="nr-btn nr-complete" onClick={() => completeTask(task.id)}>
-                        ✓ Completar
+                      <button
+                        className={`nr-btn ${doneToday ? 'nr-done-today' : 'nr-complete'}`}
+                        onClick={() => markDone(r.id)}
+                      >
+                        {doneToday ? '✓ Feita hoje' : 'Fiz hoje'}
                       </button>
-                      <button className="nr-btn nr-del" title="Excluir" onClick={() => deleteTask(task.id)}>
+                      <button className="nr-btn nr-del" title="Excluir" onClick={() => removeRoutine(r.id)}>
                         🗑️
                       </button>
                     </div>
@@ -263,7 +352,8 @@ body { margin: 0; }
 .nr-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .nr-input { flex: 1; min-width: 200px; padding: 12px 15px; font-size: 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; outline: none; font-family: inherit; transition: border-color 0.15s ease; }
 .nr-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
-.nr-btn { padding: 12px 22px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; }
+.nr-field-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 10px; }
+.nr-btn { padding: 12px 22px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; white-space: nowrap; }
 .nr-btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
 .nr-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgba(79,70,229,0.45); }
 .nr-pills { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -278,11 +368,14 @@ body { margin: 0; }
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .nr-task:hover { transform: translateX(2px); box-shadow: 0 6px 16px rgba(15,23,42,0.10); }
-.nr-task-title { font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 7px; }
-.nr-badge { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; }
+.nr-task-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.nr-task-title { font-size: 16px; font-weight: 600; color: #1e293b; }
+.nr-status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; }
+.nr-meta { font-size: 13px; color: #64748b; font-weight: 500; }
 .nr-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.nr-complete { background: #10b981; color: #fff; }
-.nr-complete:hover { background: #059669; transform: translateY(-1px); }
+.nr-complete { background: #4f46e5; color: #fff; }
+.nr-complete:hover { background: #4338ca; transform: translateY(-1px); }
+.nr-done-today { background: #dcfce7; color: #16a34a; cursor: default; }
 .nr-del { background: #f1f5f9; color: #94a3b8; }
 .nr-del:hover { background: #fee2e2; color: #ef4444; }
 .nr-empty { background: #fff; border: 1.5px dashed #cbd5e1; border-radius: 16px; padding: 44px 24px; text-align: center; color: #94a3b8; font-size: 15px; font-weight: 500; }
