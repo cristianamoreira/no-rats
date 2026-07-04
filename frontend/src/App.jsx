@@ -7,41 +7,10 @@ const FREQUENCIES = {
   mensal: { label: 'Mensal', days: 30, xp: 40 },
 }
 
-const STARTERS = [
-  { title: 'Lavar a louça', freq: 'diaria' },
-  { title: 'Lavar roupa', freq: 'semanal' },
-  { title: 'Limpar o banheiro', freq: 'semanal' },
-  { title: 'Trocar a roupa de cama', freq: 'quinzenal' },
-  { title: 'Faxina geral', freq: 'mensal' },
-]
+const COLORS = ['#4f46e5', '#0ea5e9', '#f59e0b', '#ec4899', '#10b981', '#8b5cf6']
+const EMOJIS = ['👩', '👨', '🧒', '👧', '👦', '🧑', '👵', '👴', '🐱', '🐶']
 
 const MS = 86400000
-
-function RatLogo() {
-  // Rato de perfil, minimalista — olhando para a direita
-  return (
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path
-        d="M17 41 C 8 44 6 53 13 55 C 18 56 21 51 17 48"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-      />
-      <circle cx="29" cy="17" r="8" fill="currentColor" />
-      <path
-        d="M53 39
-           C 50 30 43 25 35 25
-           C 23 25 14 30 14 39
-           C 14 46 20 50 28 50
-           C 38 50 47 46 52 40 Z"
-        fill="currentColor"
-      />
-      <circle cx="44" cy="35" r="2.3" fill="#6d4fd6" />
-      <circle cx="53" cy="39" r="1.9" fill="#6d4fd6" />
-    </svg>
-  )
-}
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -55,114 +24,183 @@ function daysSince(dateStr) {
 function getStatus(routine) {
   const freq = FREQUENCIES[routine.freq] || FREQUENCIES.semanal
   const ds = daysSince(routine.lastDone)
-
   if (ds === null) {
     return { kind: 'none', color: '#94a3b8', label: 'Sem registro', last: 'Nunca registrada', sort: -0.4 }
   }
-
   let last
   if (ds === 0) last = 'Última vez: hoje'
   else if (ds === 1) last = 'Última vez: ontem'
   else last = `Última vez: há ${ds} dias`
-
   if (ds < freq.days) {
     const rem = freq.days - ds
-    return {
-      kind: 'ok',
-      color: '#10b981',
-      label: 'Em dia',
-      last,
-      sub: `Próxima em ${rem} ${rem === 1 ? 'dia' : 'dias'}`,
-      sort: -(rem),
-    }
+    return { kind: 'ok', color: '#10b981', label: 'Em dia', last, sub: `Próxima em ${rem} ${rem === 1 ? 'dia' : 'dias'}`, sort: -(rem) }
   }
-
   const over = ds - freq.days
-  if (over === 0) {
-    return { kind: 'due', color: '#f59e0b', label: 'Vence hoje', last, sort: 0 }
-  }
-  return {
-    kind: 'late',
-    color: '#ef4444',
-    label: `Atrasada há ${over} ${over === 1 ? 'dia' : 'dias'}`,
-    last,
-    sort: over,
-  }
+  if (over === 0) return { kind: 'due', color: '#f59e0b', label: 'Vence hoje', last, sort: 0 }
+  return { kind: 'late', color: '#ef4444', label: `Atrasada há ${over} ${over === 1 ? 'dia' : 'dias'}`, last, sort: over }
+}
+
+function RatLogo() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M17 41 C 8 44 6 53 13 55 C 18 56 21 51 17 48" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+      <circle cx="29" cy="17" r="8" fill="currentColor" />
+      <path d="M53 39 C 50 30 43 25 35 25 C 23 25 14 30 14 39 C 14 46 20 50 28 50 C 38 50 47 46 52 40 Z" fill="currentColor" />
+      <circle cx="44" cy="35" r="2.3" fill="#6d4fd6" />
+      <circle cx="53" cy="39" r="1.9" fill="#6d4fd6" />
+    </svg>
+  )
+}
+
+function defaultState() {
+  const members = [
+    { id: 'm1', name: 'Ana', emoji: '👩', color: COLORS[0], xp: 0, rats: 0 },
+    { id: 'm2', name: 'João', emoji: '👨', color: COLORS[1], xp: 0, rats: 0 },
+  ]
+  const starters = [
+    { title: 'Lavar a louça', freq: 'diaria', ownerId: 'm2' },
+    { title: 'Lavar roupa', freq: 'semanal', ownerId: 'm1' },
+    { title: 'Limpar o banheiro', freq: 'semanal', ownerId: 'm2' },
+    { title: 'Trocar a roupa de cama', freq: 'quinzenal', ownerId: 'm1' },
+    { title: 'Faxina geral', freq: 'mensal', ownerId: 'm2' },
+  ]
+  const routines = starters.map((s, i) => ({
+    id: 'r' + (Date.now() + i),
+    title: s.title,
+    freq: s.freq,
+    xp: FREQUENCIES[s.freq].xp,
+    ownerId: s.ownerId,
+    lastDone: null,
+    penalized: false,
+  }))
+  return { members, leaderId: 'm1', activeId: 'm1', routines }
 }
 
 function loadState() {
   try {
-    const raw = localStorage.getItem('norats')
+    const raw = localStorage.getItem('norats_v2')
     if (raw) {
       const s = JSON.parse(raw)
-      if (Array.isArray(s.routines)) return s
+      if (Array.isArray(s.members) && Array.isArray(s.routines)) return s
     }
   } catch (e) {}
-  return {
-    routines: STARTERS.map((s, i) => ({ id: Date.now() + i, title: s.title, freq: s.freq, lastDone: null })),
-    xp: 0,
-    streak: 0,
-    lastDay: null,
-  }
+  return defaultState()
 }
 
 export default function App() {
-  const initial = loadState()
-  const [routines, setRoutines] = useState(initial.routines)
-  const [xp, setXp] = useState(initial.xp)
-  const [streak, setStreak] = useState(initial.streak)
-  const [lastDay, setLastDay] = useState(initial.lastDay)
-  const [title, setTitle] = useState('')
-  const [freq, setFreq] = useState('semanal')
+  const [state, setState] = useState(loadState)
   const [toast, setToast] = useState(null)
 
+  const [rTitle, setRTitle] = useState('')
+  const [rFreq, setRFreq] = useState('semanal')
+  const [rXp, setRXp] = useState(15)
+  const [rOwner, setROwner] = useState('')
+
+  const [pName, setPName] = useState('')
+  const [pEmoji, setPEmoji] = useState('🧒')
+
   useEffect(() => {
-    localStorage.setItem('norats', JSON.stringify({ routines, xp, streak, lastDay }))
-  }, [routines, xp, streak, lastDay])
+    localStorage.setItem('norats_v2', JSON.stringify(state))
+  }, [state])
+
+  useEffect(() => {
+    setState((prev) => {
+      let changed = false
+      const members = prev.members.map((m) => ({ ...m }))
+      const routines = prev.routines.map((r) => {
+        const st = getStatus(r)
+        if (st.kind === 'late' && !r.penalized) {
+          const owner = members.find((m) => m.id === r.ownerId)
+          if (owner) {
+            owner.rats += 1
+            changed = true
+          }
+          return { ...r, penalized: true }
+        }
+        return r
+      })
+      return changed ? { ...prev, members, routines } : prev
+    })
+  }, [])
+
+  const { members, leaderId, activeId, routines } = state
+  const active = members.find((m) => m.id === activeId) || members[0]
+  const isLeader = active && active.id === leaderId
 
   const showToast = (msg) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2600)
   }
 
+  const setActive = (id) => setState((p) => ({ ...p, activeId: id }))
+
+  const setFreqForm = (key) => {
+    setRFreq(key)
+    setRXp(FREQUENCIES[key].xp)
+  }
+
+  const addMember = () => {
+    if (!pName.trim()) return showToast('✏️ Digite o nome!')
+    const id = 'm' + Date.now()
+    const color = COLORS[members.length % COLORS.length]
+    setState((p) => ({ ...p, members: [...p.members, { id, name: pName.trim(), emoji: pEmoji, color, xp: 0, rats: 0 }] }))
+    setPName('')
+    showToast(`👋 ${pName.trim()} entrou na família!`)
+  }
+
+  const removeMember = (id) => {
+    if (members.length <= 1) return showToast('Precisa ter ao menos 1 pessoa.')
+    setState((p) => {
+      const nextMembers = p.members.filter((m) => m.id !== id)
+      const nextLeader = p.leaderId === id ? nextMembers[0].id : p.leaderId
+      const nextActive = p.activeId === id ? nextMembers[0].id : p.activeId
+      const routines = p.routines.map((r) => (r.ownerId === id ? { ...r, ownerId: nextLeader } : r))
+      return { ...p, members: nextMembers, leaderId: nextLeader, activeId: nextActive, routines }
+    })
+  }
+
+  const makeLeader = (id) => {
+    setState((p) => ({ ...p, leaderId: id }))
+    showToast('👑 Novo líder da família!')
+  }
+
   const addRoutine = () => {
-    if (!title.trim()) return showToast('✏️ Dê um nome para a rotina!')
-    setRoutines([...routines, { id: Date.now(), title: title.trim(), freq, lastDone: null }])
-    setTitle('')
+    if (!rTitle.trim()) return showToast('✏️ Dê um nome para a rotina!')
+    const owner = rOwner || leaderId
+    setState((p) => ({
+      ...p,
+      routines: [
+        ...p.routines,
+        { id: 'r' + Date.now(), title: rTitle.trim(), freq: rFreq, xp: Number(rXp) || FREQUENCIES[rFreq].xp, ownerId: owner, lastDone: null, penalized: false },
+      ],
+    }))
+    setRTitle('')
+    showToast('✅ Rotina criada!')
   }
 
   const markDone = (id) => {
+    const today = todayStr()
     const routine = routines.find((r) => r.id === id)
     if (!routine) return
-    const today = todayStr()
-    if (routine.lastDone === today) {
-      showToast('✨ Já registrada hoje!')
-      return
-    }
-    const reward = (FREQUENCIES[routine.freq] || FREQUENCIES.semanal).xp
-    const prevLevel = Math.floor(xp / 100) + 1
-    const newXp = xp + reward
-    const newLevel = Math.floor(newXp / 100) + 1
-    if (lastDay !== today) {
-      const yesterday = new Date(Date.now() - MS).toISOString().slice(0, 10)
-      setStreak(lastDay === yesterday ? streak + 1 : 1)
-      setLastDay(today)
-    }
-    setXp(newXp)
-    setRoutines(routines.map((r) => (r.id === id ? { ...r, lastDone: today } : r)))
-    if (newLevel > prevLevel) showToast(`🎉 LEVEL UP! Você chegou ao Nível ${newLevel}!`)
-    else showToast(`✅ Registrada! +${reward} XP`)
+    if (routine.lastDone === today) return showToast('✨ Já registrada hoje!')
+    const owner = members.find((m) => m.id === routine.ownerId)
+    setState((p) => ({
+      ...p,
+      members: p.members.map((m) => (m.id === routine.ownerId ? { ...m, xp: m.xp + routine.xp } : m)),
+      routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
+    }))
+    showToast(`✅ +${routine.xp} XP para ${owner ? owner.name : 'a casa'}!`)
   }
 
-  const removeRoutine = (id) => setRoutines(routines.filter((r) => r.id !== id))
   const updateFreq = (id, newFreq) =>
-    setRoutines(routines.map((r) => (r.id === id ? { ...r, freq: newFreq } : r)))
+    setState((p) => ({ ...p, routines: p.routines.map((r) => (r.id === id ? { ...r, freq: newFreq } : r)) }))
 
-  const level = Math.floor(xp / 100) + 1
-  const progress = ((xp % 100) / 100) * 100
+  const removeRoutine = (id) =>
+    setState((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
+
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
   withStatus.sort((a, b) => b.status.sort - a.status.sort)
-  const attention = withStatus.filter((r) => r.status.kind === 'late' || r.status.kind === 'due').length
+  const memberById = (id) => members.find((m) => m.id === id)
 
   return (
     <div className="nr-app">
@@ -172,77 +210,124 @@ export default function App() {
       <header className="nr-hero">
         <div className="nr-logo"><RatLogo /></div>
         <h1 className="nr-wordmark">No Rats</h1>
-        <p className="nr-tagline">O registro inteligente das tarefas da sua casa</p>
+        <p className="nr-tagline">O jogo de manter a casa em ordem — em família</p>
       </header>
 
       <main className="nr-container">
-        <section className="nr-stats">
-          <div className="nr-card nr-stat">
-            <div className="nr-chip" style={{ background: '#eef2ff' }}>⭐</div>
-            <div className="nr-stat-val" style={{ color: '#4f46e5' }}>{xp}</div>
-            <div className="nr-stat-label">XP Total</div>
-          </div>
-          <div className="nr-card nr-stat">
-            <div className="nr-chip" style={{ background: '#f3e8ff' }}>🎖️</div>
-            <div className="nr-stat-val" style={{ color: '#7c3aed' }}>{level}</div>
-            <div className="nr-stat-label">Nível</div>
-            <div className="nr-prog"><div className="nr-prog-fill" style={{ width: `${progress}%` }} /></div>
-            <div className="nr-sub">{xp % 100}/100 XP</div>
-          </div>
-          <div className="nr-card nr-stat">
-            <div className="nr-chip" style={{ background: '#fef3c7' }}>🔥</div>
-            <div className="nr-stat-val" style={{ color: '#f59e0b' }}>{streak}</div>
-            <div className="nr-stat-label">{streak === 1 ? 'Dia seguido' : 'Dias seguidos'}</div>
-          </div>
-          <div className="nr-card nr-stat">
-            <div className="nr-chip" style={{ background: attention ? '#fee2e2' : '#dcfce7' }}>{attention ? '⚠️' : '✅'}</div>
-            <div className="nr-stat-val" style={{ color: attention ? '#ef4444' : '#10b981' }}>{attention}</div>
-            <div className="nr-stat-label">Precisam de atenção</div>
-          </div>
+        <div className="nr-field-label" style={{ marginBottom: '10px' }}>Placar da família · toque para escolher quem é você</div>
+        <section className="nr-scoreboard">
+          {members.map((m) => {
+            const isActive = m.id === activeId
+            return (
+              <button
+                key={m.id}
+                className="nr-player"
+                onClick={() => setActive(m.id)}
+                style={isActive ? { borderColor: m.color, boxShadow: `0 0 0 3px ${m.color}22` } : undefined}
+              >
+                <div className="nr-avatar" style={{ background: m.color }}>{m.emoji}</div>
+                <div className="nr-player-name">
+                  {m.name} {m.id === leaderId ? '👑' : ''}
+                </div>
+                <div className="nr-player-stats">
+                  <span className="nr-xp-pill">{m.xp} XP</span>
+                  <span className="nr-rat-pill" style={m.rats > 0 ? { background: '#fee2e2', color: '#ef4444' } : undefined}>
+                    🐀 {m.rats}
+                  </span>
+                </div>
+                {isActive && <div className="nr-you">você</div>}
+              </button>
+            )
+          })}
         </section>
 
-        <section className="nr-panel">
-          <h2 className="nr-h">Nova rotina</h2>
-          <div className="nr-row">
-            <input
-              className="nr-input"
-              type="text"
-              placeholder="Ex: Lavar as toalhas, regar as plantas…"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addRoutine()}
-            />
-            <button className="nr-btn nr-btn-primary" onClick={addRoutine}>Adicionar</button>
-          </div>
-          <div className="nr-field-label">Com que frequência?</div>
-          <div className="nr-pills">
-            {Object.entries(FREQUENCIES).map(([key, f]) => {
-              const active = freq === key
-              return (
-                <button
-                  key={key}
-                  className="nr-pill"
-                  onClick={() => setFreq(key)}
-                  style={active ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}
-                >
-                  {f.label} · +{f.xp} XP
-                </button>
-              )
-            })}
-          </div>
-        </section>
+        {isLeader && (
+          <section className="nr-panel">
+            <h2 className="nr-h">👑 Família <span className="nr-hint">(só o líder vê isto)</span></h2>
+            <div className="nr-row">
+              <select className="nr-emoji-select" value={pEmoji} onChange={(e) => setPEmoji(e.target.value)}>
+                {EMOJIS.map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+              <input
+                className="nr-input"
+                type="text"
+                placeholder="Nome da pessoa…"
+                value={pName}
+                onChange={(e) => setPName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addMember()}
+              />
+              <button className="nr-btn nr-btn-primary" onClick={addMember}>Adicionar</button>
+            </div>
+            <div className="nr-member-chips">
+              {members.map((m) => (
+                <div key={m.id} className="nr-member-chip" style={{ borderColor: m.color }}>
+                  <span>{m.emoji} {m.name} {m.id === leaderId ? '👑' : ''}</span>
+                  {m.id !== leaderId && (
+                    <button className="nr-mini" title="Tornar líder" onClick={() => makeLeader(m.id)}>👑</button>
+                  )}
+                  <button className="nr-mini" title="Remover" onClick={() => removeMember(m.id)}>✕</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {isLeader && (
+          <section className="nr-panel">
+            <h2 className="nr-h">Nova rotina</h2>
+            <div className="nr-row">
+              <input
+                className="nr-input"
+                type="text"
+                placeholder="Ex: Lavar as toalhas, tirar o lixo…"
+                value={rTitle}
+                onChange={(e) => setRTitle(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addRoutine()}
+              />
+              <button className="nr-btn nr-btn-primary" onClick={addRoutine}>Adicionar</button>
+            </div>
+            <div className="nr-form-grid">
+              <div>
+                <div className="nr-field-label">Frequência</div>
+                <div className="nr-pills">
+                  {Object.entries(FREQUENCIES).map(([key, f]) => (
+                    <button
+                      key={key}
+                      className="nr-pill"
+                      onClick={() => setFreqForm(key)}
+                      style={rFreq === key ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="nr-field-label">Vale quantos XP?</div>
+                <input className="nr-num" type="number" min="1" value={rXp} onChange={(e) => setRXp(e.target.value)} />
+              </div>
+              <div>
+                <div className="nr-field-label">De quem é?</div>
+                <select className="nr-owner-select" value={rOwner || leaderId} onChange={(e) => setROwner(e.target.value)}>
+                  {members.map((m) => <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section>
-          <h2 className="nr-list-title">Minhas rotinas · {routines.length}</h2>
+          <h2 className="nr-list-title">Rotinas da casa · {routines.length}</h2>
           {routines.length === 0 ? (
             <div className="nr-empty">
               <div style={{ fontSize: '34px', marginBottom: '8px' }}>🧹</div>
-              Nenhuma rotina ainda. Adicione a primeira acima!
+              Nenhuma rotina ainda.
             </div>
           ) : (
             <div className="nr-tasks">
               {withStatus.map((r) => {
                 const s = r.status
+                const owner = memberById(r.ownerId)
                 const doneToday = r.lastDone === todayStr()
                 return (
                   <div className="nr-task" key={r.id} style={{ borderLeftColor: s.color }}>
@@ -250,16 +335,25 @@ export default function App() {
                       <div className="nr-task-head">
                         <span className="nr-task-title">{r.title}</span>
                         <span className="nr-status" style={{ background: s.color }}>{s.label}</span>
+                        {owner && (
+                          <span className="nr-owner-tag" style={{ background: owner.color }}>
+                            {owner.emoji} {owner.name}
+                          </span>
+                        )}
                       </div>
-                      <div className="nr-meta">{s.last}{s.sub ? ` · ${s.sub}` : ''}</div>
-                      <div className="nr-freq-row">
-                        <span className="nr-freq-lbl">Frequência:</span>
-                        <select className="nr-freq" value={r.freq} onChange={(e) => updateFreq(r.id, e.target.value)}>
-                          {Object.entries(FREQUENCIES).map(([key, f]) => (
-                            <option key={key} value={key}>{f.label}</option>
-                          ))}
-                        </select>
+                      <div className="nr-meta">
+                        {s.last}{s.sub ? ` · ${s.sub}` : ''} · vale {r.xp} XP
                       </div>
+                      {isLeader && (
+                        <div className="nr-freq-row">
+                          <span className="nr-freq-lbl">Frequência:</span>
+                          <select className="nr-freq" value={r.freq} onChange={(e) => updateFreq(r.id, e.target.value)}>
+                            {Object.entries(FREQUENCIES).map(([key, f]) => (
+                              <option key={key} value={key}>{f.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <div className="nr-actions">
                       <button
@@ -268,7 +362,9 @@ export default function App() {
                       >
                         {doneToday ? '✓ Feita hoje' : 'Fiz hoje'}
                       </button>
-                      <button className="nr-btn nr-del" title="Excluir" onClick={() => removeRoutine(r.id)}>🗑️</button>
+                      {isLeader && (
+                        <button className="nr-btn nr-del" title="Excluir" onClick={() => removeRoutine(r.id)}>🗑️</button>
+                      )}
                     </div>
                   </div>
                 )
@@ -288,47 +384,57 @@ const CSS = `
 * { box-sizing: border-box; }
 body { margin: 0; }
 .nr-app { min-height: 100vh; background: #f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
-.nr-hero { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 52px 20px 70px; text-align: center; color: #fff; }
-.nr-logo { width: 76px; height: 76px; margin: 0 auto; border-radius: 22px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
-.nr-logo svg { width: 46px; height: 46px; color: #fff; }
-.nr-wordmark { font-size: 36px; font-weight: 800; letter-spacing: -0.025em; margin: 18px 0 6px; }
+.nr-hero { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 48px 20px 66px; text-align: center; color: #fff; }
+.nr-logo { width: 72px; height: 72px; margin: 0 auto; border-radius: 22px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
+.nr-logo svg { width: 44px; height: 44px; color: #fff; }
+.nr-wordmark { font-size: 34px; font-weight: 800; letter-spacing: -0.025em; margin: 16px 0 6px; }
 .nr-tagline { opacity: 0.88; font-size: 15px; margin: 0; font-weight: 500; }
-.nr-container { max-width: 880px; margin: -40px auto 0; padding: 0 20px 64px; }
-.nr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 22px; }
-.nr-card { background: #fff; border: 1px solid #e9ecf2; border-radius: 18px; padding: 20px; box-shadow: 0 4px 16px rgba(15,23,42,0.06); transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.nr-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(15,23,42,0.10); }
-.nr-stat { display: flex; flex-direction: column; gap: 8px; }
-.nr-chip { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
-.nr-stat-val { font-size: 30px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.nr-stat-label { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-.nr-sub { font-size: 11px; color: #94a3b8; font-weight: 500; }
-.nr-prog { height: 7px; background: #eef2f7; border-radius: 999px; overflow: hidden; margin-top: 4px; }
-.nr-prog-fill { height: 100%; background: linear-gradient(90deg, #4f46e5, #7c3aed); border-radius: 999px; transition: width 0.4s ease; }
-.nr-panel { background: #fff; border: 1px solid #e9ecf2; border-radius: 18px; padding: 22px; box-shadow: 0 4px 16px rgba(15,23,42,0.06); margin-bottom: 26px; }
+.nr-container { max-width: 880px; margin: -38px auto 0; padding: 0 20px 64px; }
+.nr-scoreboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 26px; }
+.nr-player { position: relative; background: #fff; border: 2px solid #e9ecf2; border-radius: 18px; padding: 18px 14px; cursor: pointer; text-align: center; font-family: inherit; box-shadow: 0 4px 16px rgba(15,23,42,0.06); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.nr-player:hover { transform: translateY(-2px); }
+.nr-avatar { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 8px; }
+.nr-player-name { font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 8px; }
+.nr-player-stats { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.nr-xp-pill { background: #eef2ff; color: #4f46e5; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+.nr-rat-pill { background: #f1f5f9; color: #94a3b8; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+.nr-you { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+.nr-panel { background: #fff; border: 1px solid #e9ecf2; border-radius: 18px; padding: 22px; box-shadow: 0 4px 16px rgba(15,23,42,0.06); margin-bottom: 22px; }
 .nr-h { font-size: 15px; font-weight: 700; margin: 0 0 14px; }
-.nr-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-.nr-input { flex: 1; min-width: 200px; padding: 12px 15px; font-size: 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; outline: none; font-family: inherit; transition: border-color 0.15s ease; }
+.nr-hint { font-weight: 500; font-size: 12px; color: #94a3b8; }
+.nr-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.nr-input { flex: 1; min-width: 160px; padding: 12px 15px; font-size: 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; outline: none; font-family: inherit; transition: border-color 0.15s ease; }
 .nr-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
-.nr-field-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 10px; }
-.nr-btn { padding: 12px 22px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; white-space: nowrap; }
+.nr-emoji-select, .nr-owner-select { padding: 12px 10px; font-size: 18px; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; cursor: pointer; font-family: inherit; outline: none; }
+.nr-owner-select { font-size: 14px; font-weight: 600; color: #475569; width: 100%; }
+.nr-num { width: 100%; padding: 10px 12px; font-size: 14px; font-weight: 600; border: 1.5px solid #e2e8f0; border-radius: 12px; outline: none; font-family: inherit; }
+.nr-num:focus, .nr-owner-select:focus { border-color: #6366f1; }
+.nr-form-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 620px) { .nr-form-grid { grid-template-columns: 2fr 1fr 1.3fr; align-items: start; } }
+.nr-field-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 8px; }
+.nr-btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; white-space: nowrap; }
 .nr-btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
 .nr-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgba(79,70,229,0.45); }
-.nr-pills { display: flex; gap: 10px; flex-wrap: wrap; }
-.nr-pill { padding: 8px 15px; border-radius: 999px; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
+.nr-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.nr-pill { padding: 8px 14px; border-radius: 999px; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
 .nr-pill:hover { border-color: #cbd5e1; }
+.nr-member-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.nr-member-chip { display: flex; align-items: center; gap: 6px; border: 1.5px solid #e2e8f0; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600; color: #334155; }
+.nr-mini { width: 24px; height: 24px; border: none; border-radius: 50%; background: #f1f5f9; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.nr-mini:hover { background: #e2e8f0; }
 .nr-list-title { font-size: 15px; font-weight: 700; color: #334155; margin: 0 0 14px; }
 .nr-tasks { display: grid; gap: 12px; }
 .nr-task { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; border: 1px solid #e9ecf2; border-left: 4px solid #10b981; border-radius: 14px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(15,23,42,0.05); transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .nr-task:hover { transform: translateX(2px); box-shadow: 0 6px 16px rgba(15,23,42,0.10); }
-.nr-task-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.nr-task-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .nr-task-title { font-size: 16px; font-weight: 600; color: #1e293b; }
 .nr-status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; }
+.nr-owner-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; }
 .nr-meta { font-size: 13px; color: #64748b; font-weight: 500; }
 .nr-freq-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .nr-freq-lbl { font-size: 12px; color: #94a3b8; font-weight: 600; }
-.nr-freq { font-family: inherit; font-size: 12px; font-weight: 600; color: #475569; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 4px 8px; cursor: pointer; outline: none; transition: border-color 0.15s ease; }
+.nr-freq { font-family: inherit; font-size: 12px; font-weight: 600; color: #475569; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 4px 8px; cursor: pointer; outline: none; }
 .nr-freq:hover { border-color: #cbd5e1; }
-.nr-freq:focus { border-color: #6366f1; }
 .nr-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .nr-complete { background: #4f46e5; color: #fff; }
 .nr-complete:hover { background: #4338ca; transform: translateY(-1px); }
