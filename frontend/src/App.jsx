@@ -9,13 +9,25 @@ const FREQUENCIES = {
 
 const COLORS = ['#4f46e5', '#0ea5e9', '#f59e0b', '#ec4899', '#10b981', '#8b5cf6']
 const EMOJIS = ['👩', '👨', '🧒', '👧', '👦', '🧑', '👵', '👴', '🐱', '🐶']
+const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+
+const SUGGESTIONS = [
+  { title: 'Tirar o lixo', freq: 'diaria' },
+  { title: 'Regar as plantas', freq: 'semanal' },
+  { title: 'Passar pano no chão', freq: 'semanal' },
+  { title: 'Aspirar a casa', freq: 'semanal' },
+  { title: 'Trocar as toalhas', freq: 'semanal' },
+  { title: 'Limpar a geladeira', freq: 'mensal' },
+]
 
 const MS = 86400000
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
-
+function addDays(dateStr, n) {
+  return new Date(Date.parse(dateStr) + n * MS).toISOString().slice(0, 10)
+}
 function daysSince(dateStr) {
   if (!dateStr) return null
   return Math.round((Date.parse(todayStr()) - Date.parse(dateStr)) / MS)
@@ -43,11 +55,26 @@ function getStatus(routine) {
 function RatLogo() {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M17 41 C 8 44 6 53 13 55 C 18 56 21 51 17 48" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-      <circle cx="29" cy="17" r="8" fill="currentColor" />
-      <path d="M53 39 C 50 30 43 25 35 25 C 23 25 14 30 14 39 C 14 46 20 50 28 50 C 38 50 47 46 52 40 Z" fill="currentColor" />
-      <circle cx="44" cy="35" r="2.3" fill="#6d4fd6" />
-      <circle cx="53" cy="39" r="1.9" fill="#6d4fd6" />
+      <path
+        d="M15 45 C 6 47 4 56 11 57 C 17 58 19 52 15 49"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <circle cx="40" cy="21" r="7" fill="currentColor" />
+      <circle cx="40" cy="21" r="3" fill="#6d4fd6" />
+      <path
+        d="M55 35
+           C 52 27 46 23 39 24
+           C 27 25 16 28 14 37
+           C 12.5 43 15 48 22 49
+           C 32 50 43 47 50 41
+           C 53 38.5 55 37 55 35 Z"
+        fill="currentColor"
+      />
+      <circle cx="47" cy="33" r="2.1" fill="#6d4fd6" />
+      <circle cx="55" cy="35" r="1.7" fill="#6d4fd6" />
     </svg>
   )
 }
@@ -90,6 +117,7 @@ function loadState() {
 export default function App() {
   const [state, setState] = useState(loadState)
   const [toast, setToast] = useState(null)
+  const [view, setView] = useState('hoje')
 
   const [rTitle, setRTitle] = useState('')
   const [rFreq, setRFreq] = useState('semanal')
@@ -139,6 +167,11 @@ export default function App() {
     setRXp(FREQUENCIES[key].xp)
   }
 
+  const useSuggestion = (sug) => {
+    setRTitle(sug.title)
+    setFreqForm(sug.freq)
+  }
+
   const addMember = () => {
     if (!pName.trim()) return showToast('✏️ Digite o nome!')
     const id = 'm' + Date.now()
@@ -178,18 +211,24 @@ export default function App() {
     showToast('✅ Rotina criada!')
   }
 
-  const markDone = (id) => {
+  const completeTask = (id, stealerId) => {
     const today = todayStr()
     const routine = routines.find((r) => r.id === id)
     if (!routine) return
     if (routine.lastDone === today) return showToast('✨ Já registrada hoje!')
     const owner = members.find((m) => m.id === routine.ownerId)
+    const creditId = stealerId || routine.ownerId
+    const credit = members.find((m) => m.id === creditId)
     setState((p) => ({
       ...p,
-      members: p.members.map((m) => (m.id === routine.ownerId ? { ...m, xp: m.xp + routine.xp } : m)),
+      members: p.members.map((m) => (m.id === creditId ? { ...m, xp: m.xp + routine.xp } : m)),
       routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
     }))
-    showToast(`✅ +${routine.xp} XP para ${owner ? owner.name : 'a casa'}!`)
+    if (stealerId && owner && stealerId !== owner.id) {
+      showToast(`🥷 ${credit.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP`)
+    } else {
+      showToast(`✅ +${routine.xp} XP para ${credit ? credit.name : 'a casa'}`)
+    }
   }
 
   const updateFreq = (id, newFreq) =>
@@ -198,9 +237,27 @@ export default function App() {
   const removeRoutine = (id) =>
     setState((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
 
+  const memberById = (id) => members.find((m) => m.id === id)
+
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
   withStatus.sort((a, b) => b.status.sort - a.status.sort)
-  const memberById = (id) => members.find((m) => m.id === id)
+
+  const today = todayStr()
+  const weekDays = []
+  for (let i = 0; i < 7; i++) weekDays.push({ offset: i, date: addDays(today, i), items: [] })
+  routines.forEach((r) => {
+    const freq = FREQUENCIES[r.freq] || FREQUENCIES.semanal
+    const due = r.lastDone ? addDays(r.lastDone, freq.days) : today
+    let diff = Math.round((Date.parse(due) - Date.parse(today)) / MS)
+    if (diff < 0) diff = 0
+    if (diff <= 6) weekDays[diff].items.push(r)
+  })
+  const dayLabel = (d) => {
+    if (d.offset === 0) return 'Hoje'
+    if (d.offset === 1) return 'Amanhã'
+    const wd = WEEKDAYS[new Date(d.date + 'T00:00:00Z').getUTCDay()]
+    return `${wd} · ${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`
+  }
 
   return (
     <div className="nr-app">
@@ -226,14 +283,10 @@ export default function App() {
                 style={isActive ? { borderColor: m.color, boxShadow: `0 0 0 3px ${m.color}22` } : undefined}
               >
                 <div className="nr-avatar" style={{ background: m.color }}>{m.emoji}</div>
-                <div className="nr-player-name">
-                  {m.name} {m.id === leaderId ? '👑' : ''}
-                </div>
+                <div className="nr-player-name">{m.name} {m.id === leaderId ? '👑' : ''}</div>
                 <div className="nr-player-stats">
                   <span className="nr-xp-pill">{m.xp} XP</span>
-                  <span className="nr-rat-pill" style={m.rats > 0 ? { background: '#fee2e2', color: '#ef4444' } : undefined}>
-                    🐀 {m.rats}
-                  </span>
+                  <span className="nr-rat-pill" style={m.rats > 0 ? { background: '#fee2e2', color: '#ef4444' } : undefined}>🐀 {m.rats}</span>
                 </div>
                 {isActive && <div className="nr-you">você</div>}
               </button>
@@ -262,9 +315,7 @@ export default function App() {
               {members.map((m) => (
                 <div key={m.id} className="nr-member-chip" style={{ borderColor: m.color }}>
                   <span>{m.emoji} {m.name} {m.id === leaderId ? '👑' : ''}</span>
-                  {m.id !== leaderId && (
-                    <button className="nr-mini" title="Tornar líder" onClick={() => makeLeader(m.id)}>👑</button>
-                  )}
+                  {m.id !== leaderId && <button className="nr-mini" title="Tornar líder" onClick={() => makeLeader(m.id)}>👑</button>}
                   <button className="nr-mini" title="Remover" onClick={() => removeMember(m.id)}>✕</button>
                 </div>
               ))}
@@ -291,12 +342,7 @@ export default function App() {
                 <div className="nr-field-label">Frequência</div>
                 <div className="nr-pills">
                   {Object.entries(FREQUENCIES).map(([key, f]) => (
-                    <button
-                      key={key}
-                      className="nr-pill"
-                      onClick={() => setFreqForm(key)}
-                      style={rFreq === key ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}
-                    >
+                    <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}>
                       {f.label}
                     </button>
                   ))}
@@ -313,65 +359,100 @@ export default function App() {
                 </select>
               </div>
             </div>
+            <div className="nr-field-label" style={{ marginTop: '16px' }}>💡 Sugestões — toque para preencher</div>
+            <div className="nr-suggests">
+              {SUGGESTIONS.map((s) => (
+                <button key={s.title} className="nr-suggest" onClick={() => useSuggestion(s)}>+ {s.title}</button>
+              ))}
+            </div>
           </section>
         )}
 
-        <section>
-          <h2 className="nr-list-title">Rotinas da casa · {routines.length}</h2>
-          {routines.length === 0 ? (
-            <div className="nr-empty">
-              <div style={{ fontSize: '34px', marginBottom: '8px' }}>🧹</div>
-              Nenhuma rotina ainda.
-            </div>
-          ) : (
-            <div className="nr-tasks">
-              {withStatus.map((r) => {
-                const s = r.status
-                const owner = memberById(r.ownerId)
-                const doneToday = r.lastDone === todayStr()
-                return (
-                  <div className="nr-task" key={r.id} style={{ borderLeftColor: s.color }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="nr-task-head">
-                        <span className="nr-task-title">{r.title}</span>
-                        <span className="nr-status" style={{ background: s.color }}>{s.label}</span>
-                        {owner && (
-                          <span className="nr-owner-tag" style={{ background: owner.color }}>
-                            {owner.emoji} {owner.name}
-                          </span>
+        <div className="nr-toggle">
+          <button className={view === 'hoje' ? 'active' : ''} onClick={() => setView('hoje')}>Hoje</button>
+          <button className={view === 'semana' ? 'active' : ''} onClick={() => setView('semana')}>Semana</button>
+        </div>
+
+        {view === 'hoje' ? (
+          <section>
+            <h2 className="nr-list-title">Rotinas da casa · {routines.length}</h2>
+            {routines.length === 0 ? (
+              <div className="nr-empty"><div style={{ fontSize: '34px', marginBottom: '8px' }}>🧹</div>Nenhuma rotina ainda.</div>
+            ) : (
+              <div className="nr-tasks">
+                {withStatus.map((r) => {
+                  const s = r.status
+                  const owner = memberById(r.ownerId)
+                  const doneToday = r.lastDone === todayStr()
+                  const ownerIsActive = active && active.id === r.ownerId
+                  return (
+                    <div className="nr-task" key={r.id} style={{ borderLeftColor: s.color }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="nr-task-head">
+                          <span className="nr-task-title">{r.title}</span>
+                          <span className="nr-status" style={{ background: s.color }}>{s.label}</span>
+                          {owner && <span className="nr-owner-tag" style={{ background: owner.color }}>{owner.emoji} {owner.name}</span>}
+                        </div>
+                        <div className="nr-meta">{s.last}{s.sub ? ` · ${s.sub}` : ''} · vale {r.xp} XP</div>
+                        {isLeader && (
+                          <div className="nr-freq-row">
+                            <span className="nr-freq-lbl">Frequência:</span>
+                            <select className="nr-freq" value={r.freq} onChange={(e) => updateFreq(r.id, e.target.value)}>
+                              {Object.entries(FREQUENCIES).map(([key, f]) => <option key={key} value={key}>{f.label}</option>)}
+                            </select>
+                          </div>
                         )}
                       </div>
-                      <div className="nr-meta">
-                        {s.last}{s.sub ? ` · ${s.sub}` : ''} · vale {r.xp} XP
+                      <div className="nr-actions">
+                        {doneToday ? (
+                          <button className="nr-btn nr-done-today">✓ Feita hoje</button>
+                        ) : ownerIsActive ? (
+                          <button className="nr-btn nr-complete" onClick={() => completeTask(r.id)}>Fiz hoje</button>
+                        ) : (
+                          <>
+                            <button className="nr-btn nr-complete nr-btn-sm" onClick={() => completeTask(r.id)}>Feita</button>
+                            <button className="nr-btn nr-steal nr-btn-sm" onClick={() => completeTask(r.id, active.id)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Fiz eu</button>
+                          </>
+                        )}
+                        {isLeader && <button className="nr-btn nr-del" title="Excluir" onClick={() => removeRoutine(r.id)}>🗑️</button>}
                       </div>
-                      {isLeader && (
-                        <div className="nr-freq-row">
-                          <span className="nr-freq-lbl">Frequência:</span>
-                          <select className="nr-freq" value={r.freq} onChange={(e) => updateFreq(r.id, e.target.value)}>
-                            {Object.entries(FREQUENCIES).map(([key, f]) => (
-                              <option key={key} value={key}>{f.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
                     </div>
-                    <div className="nr-actions">
-                      <button
-                        className={`nr-btn ${doneToday ? 'nr-done-today' : 'nr-complete'}`}
-                        onClick={() => markDone(r.id)}
-                      >
-                        {doneToday ? '✓ Feita hoje' : 'Fiz hoje'}
-                      </button>
-                      {isLeader && (
-                        <button className="nr-btn nr-del" title="Excluir" onClick={() => removeRoutine(r.id)}>🗑️</button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        ) : (
+          <section>
+            <h2 className="nr-list-title">Próximos 7 dias</h2>
+            {weekDays.map((d) => (
+              <div className="nr-week-day" key={d.offset}>
+                <div className="nr-week-head">{dayLabel(d)}</div>
+                {d.items.length === 0 ? (
+                  <div className="nr-week-empty">— nada previsto —</div>
+                ) : (
+                  d.items.map((r) => {
+                    const owner = memberById(r.ownerId)
+                    const doneToday = r.lastDone === todayStr()
+                    return (
+                      <div className="nr-week-item" key={r.id}>
+                        <span>
+                          <strong>{r.title}</strong>
+                          {owner && <span className="nr-owner-tag" style={{ background: owner.color, marginLeft: '8px' }}>{owner.emoji} {owner.name}</span>}
+                        </span>
+                        {doneToday ? (
+                          <button className="nr-btn nr-done-today nr-btn-sm">✓ Feita</button>
+                        ) : (
+                          <button className="nr-btn nr-complete nr-btn-sm" onClick={() => completeTask(r.id)}>Feita</button>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            ))}
+          </section>
+        )}
 
         <footer className="nr-footer">No Rats · seus dados ficam salvos com segurança neste navegador</footer>
       </main>
@@ -413,15 +494,22 @@ body { margin: 0; }
 @media (min-width: 620px) { .nr-form-grid { grid-template-columns: 2fr 1fr 1.3fr; align-items: start; } }
 .nr-field-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 8px; }
 .nr-btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; white-space: nowrap; }
+.nr-btn-sm { padding: 8px 13px; font-size: 12.5px; }
 .nr-btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
 .nr-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgba(79,70,229,0.45); }
 .nr-pills { display: flex; gap: 8px; flex-wrap: wrap; }
 .nr-pill { padding: 8px 14px; border-radius: 999px; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
 .nr-pill:hover { border-color: #cbd5e1; }
+.nr-suggests { display: flex; gap: 8px; flex-wrap: wrap; }
+.nr-suggest { padding: 6px 12px; border-radius: 999px; border: 1.5px dashed #cbd5e1; background: #fff; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
+.nr-suggest:hover { border-color: #6366f1; color: #4f46e5; }
 .nr-member-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .nr-member-chip { display: flex; align-items: center; gap: 6px; border: 1.5px solid #e2e8f0; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600; color: #334155; }
 .nr-mini { width: 24px; height: 24px; border: none; border-radius: 50%; background: #f1f5f9; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
 .nr-mini:hover { background: #e2e8f0; }
+.nr-toggle { display: inline-flex; background: #e5e9f0; border-radius: 12px; padding: 3px; gap: 2px; margin-bottom: 18px; }
+.nr-toggle button { border: none; background: transparent; padding: 8px 18px; border-radius: 9px; font-weight: 700; font-size: 13px; color: #64748b; cursor: pointer; font-family: inherit; }
+.nr-toggle button.active { background: #fff; color: #4f46e5; box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
 .nr-list-title { font-size: 15px; font-weight: 700; color: #334155; margin: 0 0 14px; }
 .nr-tasks { display: grid; gap: 12px; }
 .nr-task { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; border: 1px solid #e9ecf2; border-left: 4px solid #10b981; border-radius: 14px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(15,23,42,0.05); transition: transform 0.15s ease, box-shadow 0.15s ease; }
@@ -435,14 +523,20 @@ body { margin: 0; }
 .nr-freq-lbl { font-size: 12px; color: #94a3b8; font-weight: 600; }
 .nr-freq { font-family: inherit; font-size: 12px; font-weight: 600; color: #475569; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 4px 8px; cursor: pointer; outline: none; }
 .nr-freq:hover { border-color: #cbd5e1; }
-.nr-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.nr-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 .nr-complete { background: #4f46e5; color: #fff; }
 .nr-complete:hover { background: #4338ca; transform: translateY(-1px); }
+.nr-steal { background: #fff7ed; color: #ea580c; border: 1.5px solid #fed7aa; }
+.nr-steal:hover { background: #ffedd5; }
 .nr-done-today { background: #dcfce7; color: #16a34a; cursor: default; }
 .nr-del { background: #f1f5f9; color: #94a3b8; }
 .nr-del:hover { background: #fee2e2; color: #ef4444; }
 .nr-empty { background: #fff; border: 1.5px dashed #cbd5e1; border-radius: 16px; padding: 44px 24px; text-align: center; color: #94a3b8; font-size: 15px; font-weight: 500; }
+.nr-week-day { margin-bottom: 18px; }
+.nr-week-head { font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px; }
+.nr-week-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 1px solid #e9ecf2; border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(15,23,42,0.04); font-size: 14px; color: #1e293b; }
+.nr-week-empty { font-size: 13px; color: #cbd5e1; padding: 2px 2px 6px; }
 .nr-footer { text-align: center; margin-top: 40px; color: #94a3b8; font-size: 13px; font-weight: 500; }
-.nr-toast { position: fixed; top: 24px; left: 50%; transform: translate(-50%, 0); background: #0f172a; color: #fff; padding: 13px 24px; border-radius: 999px; font-weight: 600; font-size: 14px; box-shadow: 0 14px 36px rgba(0,0,0,0.32); z-index: 1000; animation: nrpop 0.25s ease; }
+.nr-toast { position: fixed; top: 24px; left: 50%; transform: translate(-50%, 0); background: #0f172a; color: #fff; padding: 13px 24px; border-radius: 999px; font-weight: 600; font-size: 14px; box-shadow: 0 14px 36px rgba(0,0,0,0.32); z-index: 1000; animation: nrpop 0.25s ease; max-width: 90vw; text-align: center; }
 @keyframes nrpop { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 `
