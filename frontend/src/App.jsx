@@ -42,6 +42,32 @@ function ddmm(dateStr) {
   return `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`
 }
 
+function compressImage(file, cb) {
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    const img = new Image()
+    img.onload = () => {
+      const max = 500
+      let w = img.width
+      let h = img.height
+      if (w > h && w > max) {
+        h = Math.round((h * max) / w)
+        w = max
+      } else if (h >= w && h > max) {
+        w = Math.round((w * max) / h)
+        h = max
+      }
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      c.getContext('2d').drawImage(img, 0, 0, w, h)
+      cb(c.toDataURL('image/jpeg', 0.6))
+    }
+    img.src = ev.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
 function getStatus(routine) {
   const freq = FREQUENCIES[routine.freq] || FREQUENCIES.semanal
   const ds = daysSince(routine.lastDone)
@@ -135,6 +161,8 @@ export default function App() {
   const [tab, setTab] = useState('hoje')
   const [weekOffset, setWeekOffset] = useState(0)
   const [selDay, setSelDay] = useState(todayStr())
+  const [modalRoutine, setModalRoutine] = useState(null)
+  const [lightbox, setLightbox] = useState(null)
 
   const [rTitle, setRTitle] = useState('')
   const [rFreq, setRFreq] = useState('semanal')
@@ -144,8 +172,17 @@ export default function App() {
   const [pName, setPName] = useState('')
   const [pEmoji, setPEmoji] = useState('🧒')
 
+  const showToast = (msg) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2600)
+  }
+
   useEffect(() => {
-    localStorage.setItem('norats_v2', JSON.stringify(state))
+    try {
+      localStorage.setItem('norats_v2', JSON.stringify(state))
+    } catch (e) {
+      showToast('⚠️ Armazenamento cheio — apague alguns check-ins com foto')
+    }
   }, [state])
 
   useEffect(() => {
@@ -171,11 +208,6 @@ export default function App() {
   const { members, leaderId, activeId, routines, log } = state
   const active = members.find((m) => m.id === activeId) || members[0]
   const isLeader = active && active.id === leaderId
-
-  const showToast = (msg) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2600)
-  }
 
   const setActive = (id) => setState((p) => ({ ...p, activeId: id }))
   const setFreqForm = (key) => {
@@ -226,25 +258,30 @@ export default function App() {
     showToast('✅ Rotina criada!')
   }
 
-  const completeTask = (id, stealerId) => {
+  const completeTask = (id, creditId, photos) => {
     const today = todayStr()
     const routine = routines.find((r) => r.id === id)
     if (!routine) return
     if (routine.lastDone === today) return showToast('✨ Já registrada hoje!')
     const owner = members.find((m) => m.id === routine.ownerId)
-    const creditId = stealerId || routine.ownerId
-    const credit = members.find((m) => m.id === creditId)
-    const entry = { id: 'l' + Date.now(), memberId: creditId, title: routine.title, xp: routine.xp, date: today }
+    const cid = creditId || routine.ownerId
+    const credit = members.find((m) => m.id === cid)
+    const entry = { id: 'l' + Date.now(), memberId: cid, title: routine.title, xp: routine.xp, date: today }
+    if (photos) {
+      if (photos.before) entry.before = photos.before
+      if (photos.after) entry.after = photos.after
+    }
     setState((p) => ({
       ...p,
-      members: p.members.map((m) => (m.id === creditId ? { ...m, xp: m.xp + routine.xp } : m)),
+      members: p.members.map((m) => (m.id === cid ? { ...m, xp: m.xp + routine.xp } : m)),
       routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
       log: [...p.log, entry],
     }))
-    if (stealerId && owner && stealerId !== owner.id) {
-      showToast(`🥷 ${credit.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP`)
+    const photoTag = photos && (photos.before || photos.after) ? ' 📸' : ''
+    if (owner && cid !== owner.id) {
+      showToast(`🥷 ${credit.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP${photoTag}`)
     } else {
-      showToast(`✅ +${routine.xp} XP para ${credit ? credit.name : 'a casa'}`)
+      showToast(`✅ +${routine.xp} XP para ${credit ? credit.name : 'a casa'}${photoTag}`)
     }
   }
 
@@ -283,6 +320,25 @@ export default function App() {
       <style>{CSS}</style>
       {toast && <div className="nr-toast">{toast}</div>}
 
+      {modalRoutine && (
+        <CheckinModal
+          routine={modalRoutine}
+          members={members}
+          defaultCredit={modalRoutine.ownerId}
+          onConfirm={(cid, photos) => {
+            completeTask(modalRoutine.id, cid, photos)
+            setModalRoutine(null)
+          }}
+          onClose={() => setModalRoutine(null)}
+        />
+      )}
+
+      {lightbox && (
+        <div className="nr-lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="check-in" />
+        </div>
+      )}
+
       <header className="nr-hero">
         <div className="nr-logo"><RatLogo /></div>
         <h1 className="nr-wordmark">No Rats</h1>
@@ -290,7 +346,9 @@ export default function App() {
       </header>
 
       <main className="nr-container">
-        <div className="nr-field-label" style={{ marginBottom: '10px' }}>Placar geral · toque para escolher quem é você</div>
+        <div className="nr-field-label" style={{ marginBottom: '12px', fontSize: '15px', color: '#334155' }}>
+          Placar geral <span style={{ color: '#94a3b8', fontWeight: 500 }}>· toque para escolher quem é você</span>
+        </div>
         <section className="nr-scoreboard">
           {members.map((m) => {
             const isActive = m.id === activeId
@@ -401,6 +459,9 @@ export default function App() {
                         )}
                       </div>
                       <div className="nr-actions">
+                        {!doneToday && (
+                          <button className="nr-btn nr-photo-btn nr-btn-sm" title="Check-in com foto" onClick={() => setModalRoutine(r)}>📸</button>
+                        )}
                         {doneToday ? (
                           <button className="nr-btn nr-done-today">✓ Feita hoje</button>
                         ) : ownerIsActive ? (
@@ -453,13 +514,32 @@ export default function App() {
               <div className="nr-tasks">
                 {selCheckins.map((l) => {
                   const m = memberById(l.memberId)
+                  const hasPhoto = l.before || l.after
                   return (
-                    <div className="nr-week-item" key={l.id}>
-                      <span>
-                        {m && <span className="nr-owner-tag" style={{ background: m.color, marginRight: '8px' }}>{m.emoji} {m.name}</span>}
-                        <strong>{l.title}</strong>
-                      </span>
-                      <span className="nr-xp-pill">+{l.xp} XP</span>
+                    <div className="nr-checkin" key={l.id}>
+                      <div className="nr-checkin-top">
+                        <span>
+                          {m && <span className="nr-owner-tag" style={{ background: m.color, marginRight: '8px' }}>{m.emoji} {m.name}</span>}
+                          <strong>{l.title}</strong>
+                        </span>
+                        <span className="nr-xp-pill">+{l.xp} XP</span>
+                      </div>
+                      {hasPhoto && (
+                        <div className="nr-checkin-photos">
+                          {l.before && (
+                            <figure className="nr-ba">
+                              <img src={l.before} className="nr-ba-img" onClick={() => setLightbox(l.before)} alt="antes" />
+                              <figcaption>Antes</figcaption>
+                            </figure>
+                          )}
+                          {l.after && (
+                            <figure className="nr-ba">
+                              <img src={l.after} className="nr-ba-img" onClick={() => setLightbox(l.after)} alt="depois" />
+                              <figcaption>Depois</figcaption>
+                            </figure>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -477,6 +557,42 @@ export default function App() {
 
         <footer className="nr-footer">No Rats · seus dados ficam salvos com segurança neste navegador</footer>
       </main>
+    </div>
+  )
+}
+
+function CheckinModal({ routine, members, defaultCredit, onConfirm, onClose }) {
+  const [before, setBefore] = useState(null)
+  const [after, setAfter] = useState(null)
+  const [credit, setCredit] = useState(defaultCredit)
+  const pick = (setter) => (e) => {
+    const f = e.target.files && e.target.files[0]
+    if (f) compressImage(f, setter)
+  }
+  return (
+    <div className="nr-modal-bg" onClick={onClose}>
+      <div className="nr-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="nr-h" style={{ marginBottom: '4px' }}>📸 Check-in</h3>
+        <div className="nr-meta" style={{ marginBottom: '16px' }}>{routine.title}</div>
+        <div className="nr-photo-slots">
+          <label className="nr-photo-slot">
+            {before ? <img src={before} className="nr-photo-img" alt="antes" /> : <span className="nr-photo-ph">📷<br />Antes</span>}
+            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={pick(setBefore)} />
+          </label>
+          <label className="nr-photo-slot">
+            {after ? <img src={after} className="nr-photo-img" alt="depois" /> : <span className="nr-photo-ph">✨<br />Depois</span>}
+            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={pick(setAfter)} />
+          </label>
+        </div>
+        <div className="nr-field-label" style={{ marginTop: '16px' }}>Quem fez?</div>
+        <select className="nr-owner-select" value={credit} onChange={(e) => setCredit(e.target.value)}>
+          {members.map((m) => <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
+        </select>
+        <div className="nr-modal-actions">
+          <button className="nr-btn nr-del" onClick={onClose}>Cancelar</button>
+          <button className="nr-btn nr-btn-primary" onClick={() => onConfirm(credit, { before, after })}>Registrar check-in</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -523,11 +639,11 @@ body { margin: 0; }
 .nr-avatar-sm { width: 34px; height: 34px; font-size: 18px; margin: 0; }
 .nr-player-name { font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 8px; }
 .nr-player-stats { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-.nr-xp-pill { background: #eef2ff; color: #4f46e5; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+.nr-xp-pill { background: #eef2ff; color: #4f46e5; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .nr-rat-pill { background: #f1f5f9; color: #94a3b8; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
 .nr-you { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
 .nr-panel { background: #fff; border: 1px solid #e9ecf2; border-radius: 18px; padding: 22px; box-shadow: 0 4px 16px rgba(15,23,42,0.06); margin-bottom: 22px; }
-.nr-h { font-size: 15px; font-weight: 700; margin: 0 0 14px; }
+.nr-h { font-size: 15px; font-weight: 700; margin: 0 0 14px; color: #1e293b; }
 .nr-hint { font-weight: 500; font-size: 12px; color: #94a3b8; }
 .nr-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .nr-input { flex: 1; min-width: 160px; padding: 12px 15px; font-size: 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; outline: none; font-family: inherit; transition: border-color 0.15s ease; }
@@ -538,7 +654,7 @@ body { margin: 0; }
 .nr-num:focus, .nr-owner-select:focus { border-color: #6366f1; }
 .nr-form-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 620px) { .nr-form-grid { grid-template-columns: 2fr 1fr 1.3fr; align-items: start; } }
-.nr-field-label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 8px; }
+.nr-field-label { font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 8px; }
 .nr-btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; white-space: nowrap; }
 .nr-btn-sm { padding: 8px 13px; font-size: 12.5px; }
 .nr-btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
@@ -574,6 +690,8 @@ body { margin: 0; }
 .nr-complete:hover { background: #4338ca; transform: translateY(-1px); }
 .nr-steal { background: #fff7ed; color: #ea580c; border: 1.5px solid #fed7aa; }
 .nr-steal:hover { background: #ffedd5; }
+.nr-photo-btn { background: #f5f3ff; color: #7c3aed; border: 1.5px solid #ddd6fe; }
+.nr-photo-btn:hover { background: #ede9fe; }
 .nr-done-today { background: #dcfce7; color: #16a34a; cursor: default; }
 .nr-del { background: #f1f5f9; color: #94a3b8; }
 .nr-del:hover { background: #fee2e2; color: #ef4444; }
@@ -589,7 +707,12 @@ body { margin: 0; }
 .nr-cal-day { font-size: 18px; font-weight: 800; color: #1e293b; margin: 2px 0 5px; }
 .nr-cal-dots { display: flex; gap: 3px; justify-content: center; min-height: 8px; flex-wrap: wrap; }
 .nr-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-.nr-week-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 1px solid #e9ecf2; border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(15,23,42,0.04); font-size: 14px; color: #1e293b; }
+.nr-checkin { background: #fff; border: 1px solid #e9ecf2; border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(15,23,42,0.04); }
+.nr-checkin-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; color: #1e293b; }
+.nr-checkin-photos { display: flex; gap: 12px; margin-top: 12px; }
+.nr-ba { margin: 0; flex: 1; text-align: center; }
+.nr-ba-img { width: 100%; height: 130px; object-fit: cover; border-radius: 12px; cursor: pointer; border: 1px solid #e9ecf2; }
+.nr-ba figcaption { font-size: 12px; font-weight: 700; color: #64748b; margin-top: 6px; }
 .nr-week-empty { font-size: 13px; color: #94a3b8; }
 .nr-rank-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
 .nr-rank-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid #f1f5f9; }
@@ -598,6 +721,17 @@ body { margin: 0; }
 .nr-rank-name { font-weight: 700; font-size: 15px; color: #1e293b; flex: 1; }
 .nr-rank-pts { font-weight: 800; font-size: 15px; color: #4f46e5; }
 .nr-footer { text-align: center; margin-top: 40px; color: #94a3b8; font-size: 13px; font-weight: 500; }
-.nr-toast { position: fixed; top: 24px; left: 50%; transform: translate(-50%, 0); background: #0f172a; color: #fff; padding: 13px 24px; border-radius: 999px; font-weight: 600; font-size: 14px; box-shadow: 0 14px 36px rgba(0,0,0,0.32); z-index: 1000; animation: nrpop 0.25s ease; max-width: 90vw; text-align: center; }
+.nr-toast { position: fixed; top: 24px; left: 50%; transform: translate(-50%, 0); background: #0f172a; color: #fff; padding: 13px 24px; border-radius: 999px; font-weight: 600; font-size: 14px; box-shadow: 0 14px 36px rgba(0,0,0,0.32); z-index: 1200; animation: nrpop 0.25s ease; max-width: 90vw; text-align: center; }
 @keyframes nrpop { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.nr-modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; animation: nrfade 0.15s ease; }
+.nr-modal { background: #fff; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 24px 60px rgba(0,0,0,0.3); }
+.nr-photo-slots { display: flex; gap: 12px; }
+.nr-photo-slot { flex: 1; aspect-ratio: 1; border: 2px dashed #cbd5e1; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; background: #f8fafc; transition: border-color 0.15s ease; }
+.nr-photo-slot:hover { border-color: #a5b4fc; }
+.nr-photo-ph { text-align: center; font-size: 22px; color: #94a3b8; font-weight: 700; line-height: 1.5; }
+.nr-photo-img { width: 100%; height: 100%; object-fit: cover; }
+.nr-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.nr-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1300; cursor: zoom-out; animation: nrfade 0.15s ease; }
+.nr-lightbox img { max-width: 100%; max-height: 100%; border-radius: 12px; }
+@keyframes nrfade { from { opacity: 0; } to { opacity: 1; } }
 `
