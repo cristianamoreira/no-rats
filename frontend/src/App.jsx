@@ -9,7 +9,8 @@ const FREQUENCIES = {
 
 const COLORS = ['#4f46e5', '#0ea5e9', '#f59e0b', '#ec4899', '#10b981', '#8b5cf6']
 const EMOJIS = ['👩', '👨', '🧒', '👧', '👦', '🧑', '👵', '👴', '🐱', '🐶']
-const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+const WD_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+const MEDALS = ['🥇', '🥈', '🥉']
 
 const SUGGESTIONS = [
   { title: 'Tirar o lixo', freq: 'diaria' },
@@ -31,6 +32,14 @@ function addDays(dateStr, n) {
 function daysSince(dateStr) {
   if (!dateStr) return null
   return Math.round((Date.parse(todayStr()) - Date.parse(dateStr)) / MS)
+}
+function weekStartOf(dateStr) {
+  const day = new Date(dateStr + 'T00:00:00Z').getUTCDay()
+  const offset = (day + 6) % 7
+  return addDays(dateStr, -offset)
+}
+function ddmm(dateStr) {
+  return `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`
 }
 
 function getStatus(routine) {
@@ -54,27 +63,30 @@ function getStatus(routine) {
 
 function RatLogo() {
   return (
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path
-        d="M15 45 C 6 47 4 56 11 57 C 17 58 19 52 15 49"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <circle cx="40" cy="21" r="7" fill="currentColor" />
-      <circle cx="40" cy="21" r="3" fill="#6d4fd6" />
-      <path
-        d="M55 35
-           C 52 27 46 23 39 24
-           C 27 25 16 28 14 37
-           C 12.5 43 15 48 22 49
-           C 32 50 43 47 50 41
-           C 53 38.5 55 37 55 35 Z"
-        fill="currentColor"
-      />
-      <circle cx="47" cy="33" r="2.1" fill="#6d4fd6" />
-      <circle cx="55" cy="35" r="1.7" fill="#6d4fd6" />
+    <svg viewBox="0 0 96 96" aria-hidden="true">
+      <path d="M63 70 C 80 73 84 56 73 52 C 67 49.5 63 56 67 60" fill="none" stroke="#9ca7b8" strokeWidth="4.5" strokeLinecap="round" />
+      <path d="M15 82 L33 82 L28 96 L20 96 Z" fill="#f0b24a" />
+      <path d="M20 82 L18 96 M24 82 L24 96 M28 82 L30 96" stroke="#d98b2b" strokeWidth="1.3" />
+      <path d="M14 82 L34 82" stroke="#c1873f" strokeWidth="3" strokeLinecap="round" />
+      <line x1="24" y1="82" x2="44" y2="44" stroke="#c1873f" strokeWidth="5" strokeLinecap="round" />
+      <ellipse cx="48" cy="66" rx="17" ry="15" fill="#9ca7b8" />
+      <ellipse cx="48" cy="69" rx="9.5" ry="10.5" fill="#cbd3df" />
+      <ellipse cx="40" cy="82" rx="5" ry="3.5" fill="#9ca7b8" />
+      <ellipse cx="56" cy="82" rx="5" ry="3.5" fill="#9ca7b8" />
+      <path d="M44 62 C 40 56 40 50 43 46" fill="none" stroke="#9ca7b8" strokeWidth="7" strokeLinecap="round" />
+      <circle cx="43" cy="45" r="5" fill="#aab3c1" />
+      <circle cx="33" cy="24" r="9" fill="#9ca7b8" />
+      <circle cx="65" cy="24" r="9" fill="#9ca7b8" />
+      <circle cx="33" cy="24" r="4.5" fill="#f4a9c7" />
+      <circle cx="65" cy="24" r="4.5" fill="#f4a9c7" />
+      <circle cx="49" cy="40" r="20" fill="#9ca7b8" />
+      <ellipse cx="49" cy="47" rx="11" ry="8" fill="#cbd3df" />
+      <circle cx="42" cy="38" r="3.2" fill="#2b3547" />
+      <circle cx="56" cy="38" r="3.2" fill="#2b3547" />
+      <circle cx="43" cy="37" r="1" fill="#fff" />
+      <circle cx="57" cy="37" r="1" fill="#fff" />
+      <circle cx="49" cy="45" r="3" fill="#ef6aa0" />
+      <path d="M38 46 H 26 M38 49 H 28 M60 46 H 72 M60 49 H 70" stroke="#b8c0cc" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   )
 }
@@ -100,7 +112,7 @@ function defaultState() {
     lastDone: null,
     penalized: false,
   }))
-  return { members, leaderId: 'm1', activeId: 'm1', routines }
+  return { members, leaderId: 'm1', activeId: 'm1', routines, log: [] }
 }
 
 function loadState() {
@@ -108,7 +120,10 @@ function loadState() {
     const raw = localStorage.getItem('norats_v2')
     if (raw) {
       const s = JSON.parse(raw)
-      if (Array.isArray(s.members) && Array.isArray(s.routines)) return s
+      if (Array.isArray(s.members) && Array.isArray(s.routines)) {
+        if (!Array.isArray(s.log)) s.log = []
+        return s
+      }
     }
   } catch (e) {}
   return defaultState()
@@ -117,7 +132,9 @@ function loadState() {
 export default function App() {
   const [state, setState] = useState(loadState)
   const [toast, setToast] = useState(null)
-  const [view, setView] = useState('hoje')
+  const [tab, setTab] = useState('hoje')
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [selDay, setSelDay] = useState(todayStr())
 
   const [rTitle, setRTitle] = useState('')
   const [rFreq, setRFreq] = useState('semanal')
@@ -151,7 +168,7 @@ export default function App() {
     })
   }, [])
 
-  const { members, leaderId, activeId, routines } = state
+  const { members, leaderId, activeId, routines, log } = state
   const active = members.find((m) => m.id === activeId) || members[0]
   const isLeader = active && active.id === leaderId
 
@@ -161,12 +178,10 @@ export default function App() {
   }
 
   const setActive = (id) => setState((p) => ({ ...p, activeId: id }))
-
   const setFreqForm = (key) => {
     setRFreq(key)
     setRXp(FREQUENCIES[key].xp)
   }
-
   const useSuggestion = (sug) => {
     setRTitle(sug.title)
     setFreqForm(sug.freq)
@@ -219,10 +234,12 @@ export default function App() {
     const owner = members.find((m) => m.id === routine.ownerId)
     const creditId = stealerId || routine.ownerId
     const credit = members.find((m) => m.id === creditId)
+    const entry = { id: 'l' + Date.now(), memberId: creditId, title: routine.title, xp: routine.xp, date: today }
     setState((p) => ({
       ...p,
       members: p.members.map((m) => (m.id === creditId ? { ...m, xp: m.xp + routine.xp } : m)),
       routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
+      log: [...p.log, entry],
     }))
     if (stealerId && owner && stealerId !== owner.id) {
       showToast(`🥷 ${credit.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP`)
@@ -233,31 +250,33 @@ export default function App() {
 
   const updateFreq = (id, newFreq) =>
     setState((p) => ({ ...p, routines: p.routines.map((r) => (r.id === id ? { ...r, freq: newFreq } : r)) }))
-
   const removeRoutine = (id) =>
     setState((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
-
   const memberById = (id) => members.find((m) => m.id === id)
 
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
   withStatus.sort((a, b) => b.status.sort - a.status.sort)
 
   const today = todayStr()
-  const weekDays = []
-  for (let i = 0; i < 7; i++) weekDays.push({ offset: i, date: addDays(today, i), items: [] })
-  routines.forEach((r) => {
-    const freq = FREQUENCIES[r.freq] || FREQUENCIES.semanal
-    const due = r.lastDone ? addDays(r.lastDone, freq.days) : today
-    let diff = Math.round((Date.parse(due) - Date.parse(today)) / MS)
-    if (diff < 0) diff = 0
-    if (diff <= 6) weekDays[diff].items.push(r)
-  })
-  const dayLabel = (d) => {
-    if (d.offset === 0) return 'Hoje'
-    if (d.offset === 1) return 'Amanhã'
-    const wd = WEEKDAYS[new Date(d.date + 'T00:00:00Z').getUTCDay()]
-    return `${wd} · ${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`
+  const wkStart = weekStartOf(today)
+  const wkEnd = addDays(wkStart, 6)
+  const monthCur = today.slice(0, 7)
+  const sumPts = (filterFn) =>
+    members
+      .map((m) => ({ m, pts: log.filter((l) => l.memberId === m.id && filterFn(l.date)).reduce((a, l) => a + l.xp, 0) }))
+      .sort((a, b) => b.pts - a.pts)
+  const weekRank = sumPts((d) => d >= wkStart && d <= wkEnd)
+  const monthRank = sumPts((d) => d.slice(0, 7) === monthCur)
+
+  const calStart = addDays(weekStartOf(today), weekOffset * 7)
+  const calDays = []
+  for (let i = 0; i < 7; i++) calDays.push(addDays(calStart, i))
+  const checkinsOn = (date) => log.filter((l) => l.date === date)
+  const membersOn = (date) => {
+    const ids = [...new Set(checkinsOn(date).map((l) => l.memberId))]
+    return ids.map((id) => memberById(id)).filter(Boolean)
   }
+  const selCheckins = checkinsOn(selDay)
 
   return (
     <div className="nr-app">
@@ -271,17 +290,12 @@ export default function App() {
       </header>
 
       <main className="nr-container">
-        <div className="nr-field-label" style={{ marginBottom: '10px' }}>Placar da família · toque para escolher quem é você</div>
+        <div className="nr-field-label" style={{ marginBottom: '10px' }}>Placar geral · toque para escolher quem é você</div>
         <section className="nr-scoreboard">
           {members.map((m) => {
             const isActive = m.id === activeId
             return (
-              <button
-                key={m.id}
-                className="nr-player"
-                onClick={() => setActive(m.id)}
-                style={isActive ? { borderColor: m.color, boxShadow: `0 0 0 3px ${m.color}22` } : undefined}
-              >
+              <button key={m.id} className="nr-player" onClick={() => setActive(m.id)} style={isActive ? { borderColor: m.color, boxShadow: `0 0 0 3px ${m.color}22` } : undefined}>
                 <div className="nr-avatar" style={{ background: m.color }}>{m.emoji}</div>
                 <div className="nr-player-name">{m.name} {m.id === leaderId ? '👑' : ''}</div>
                 <div className="nr-player-stats">
@@ -301,14 +315,7 @@ export default function App() {
               <select className="nr-emoji-select" value={pEmoji} onChange={(e) => setPEmoji(e.target.value)}>
                 {EMOJIS.map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
-              <input
-                className="nr-input"
-                type="text"
-                placeholder="Nome da pessoa…"
-                value={pName}
-                onChange={(e) => setPName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addMember()}
-              />
+              <input className="nr-input" type="text" placeholder="Nome da pessoa…" value={pName} onChange={(e) => setPName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addMember()} />
               <button className="nr-btn nr-btn-primary" onClick={addMember}>Adicionar</button>
             </div>
             <div className="nr-member-chips">
@@ -327,14 +334,7 @@ export default function App() {
           <section className="nr-panel">
             <h2 className="nr-h">Nova rotina</h2>
             <div className="nr-row">
-              <input
-                className="nr-input"
-                type="text"
-                placeholder="Ex: Lavar as toalhas, tirar o lixo…"
-                value={rTitle}
-                onChange={(e) => setRTitle(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addRoutine()}
-              />
+              <input className="nr-input" type="text" placeholder="Ex: Lavar as toalhas, tirar o lixo…" value={rTitle} onChange={(e) => setRTitle(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addRoutine()} />
               <button className="nr-btn nr-btn-primary" onClick={addRoutine}>Adicionar</button>
             </div>
             <div className="nr-form-grid">
@@ -342,9 +342,7 @@ export default function App() {
                 <div className="nr-field-label">Frequência</div>
                 <div className="nr-pills">
                   {Object.entries(FREQUENCIES).map(([key, f]) => (
-                    <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}>
-                      {f.label}
-                    </button>
+                    <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}>{f.label}</button>
                   ))}
                 </div>
               </div>
@@ -361,19 +359,18 @@ export default function App() {
             </div>
             <div className="nr-field-label" style={{ marginTop: '16px' }}>💡 Sugestões — toque para preencher</div>
             <div className="nr-suggests">
-              {SUGGESTIONS.map((s) => (
-                <button key={s.title} className="nr-suggest" onClick={() => useSuggestion(s)}>+ {s.title}</button>
-              ))}
+              {SUGGESTIONS.map((s) => <button key={s.title} className="nr-suggest" onClick={() => useSuggestion(s)}>+ {s.title}</button>)}
             </div>
           </section>
         )}
 
         <div className="nr-toggle">
-          <button className={view === 'hoje' ? 'active' : ''} onClick={() => setView('hoje')}>Hoje</button>
-          <button className={view === 'semana' ? 'active' : ''} onClick={() => setView('semana')}>Semana</button>
+          <button className={tab === 'hoje' ? 'active' : ''} onClick={() => setTab('hoje')}>Hoje</button>
+          <button className={tab === 'calendario' ? 'active' : ''} onClick={() => setTab('calendario')}>Calendário</button>
+          <button className={tab === 'ranking' ? 'active' : ''} onClick={() => setTab('ranking')}>Ranking</button>
         </div>
 
-        {view === 'hoje' ? (
+        {tab === 'hoje' && (
           <section>
             <h2 className="nr-list-title">Rotinas da casa · {routines.length}</h2>
             {routines.length === 0 ? (
@@ -422,40 +419,88 @@ export default function App() {
               </div>
             )}
           </section>
-        ) : (
+        )}
+
+        {tab === 'calendario' && (
           <section>
-            <h2 className="nr-list-title">Próximos 7 dias</h2>
-            {weekDays.map((d) => (
-              <div className="nr-week-day" key={d.offset}>
-                <div className="nr-week-head">{dayLabel(d)}</div>
-                {d.items.length === 0 ? (
-                  <div className="nr-week-empty">— nada previsto —</div>
-                ) : (
-                  d.items.map((r) => {
-                    const owner = memberById(r.ownerId)
-                    const doneToday = r.lastDone === todayStr()
-                    return (
-                      <div className="nr-week-item" key={r.id}>
-                        <span>
-                          <strong>{r.title}</strong>
-                          {owner && <span className="nr-owner-tag" style={{ background: owner.color, marginLeft: '8px' }}>{owner.emoji} {owner.name}</span>}
-                        </span>
-                        {doneToday ? (
-                          <button className="nr-btn nr-done-today nr-btn-sm">✓ Feita</button>
-                        ) : (
-                          <button className="nr-btn nr-complete nr-btn-sm" onClick={() => completeTask(r.id)}>Feita</button>
-                        )}
-                      </div>
-                    )
-                  })
-                )}
+            <div className="nr-cal-nav">
+              <button className="nr-mini" onClick={() => setWeekOffset(weekOffset - 1)}>◀</button>
+              <span className="nr-cal-range">{ddmm(calStart)} – {ddmm(addDays(calStart, 6))}</span>
+              <button className="nr-mini" onClick={() => setWeekOffset(weekOffset + 1)}>▶</button>
+            </div>
+            <div className="nr-cal-grid">
+              {calDays.map((date, i) => {
+                const isToday = date === today
+                const isSel = date === selDay
+                const ppl = membersOn(date)
+                return (
+                  <button key={date} className={`nr-cal-cell${isSel ? ' sel' : ''}${isToday ? ' today' : ''}`} onClick={() => setSelDay(date)}>
+                    <div className="nr-cal-wd">{WD_SHORT[i]}</div>
+                    <div className="nr-cal-day">{date.slice(8, 10)}</div>
+                    <div className="nr-cal-dots">
+                      {ppl.slice(0, 4).map((m) => <span key={m.id} className="nr-dot" style={{ background: m.color }} />)}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <h2 className="nr-list-title" style={{ marginTop: '20px' }}>
+              Check-ins de {selDay === today ? 'hoje' : ddmm(selDay)} · {selCheckins.length}
+            </h2>
+            {selCheckins.length === 0 ? (
+              <div className="nr-empty" style={{ padding: '30px' }}>Nenhum check-in nesse dia.</div>
+            ) : (
+              <div className="nr-tasks">
+                {selCheckins.map((l) => {
+                  const m = memberById(l.memberId)
+                  return (
+                    <div className="nr-week-item" key={l.id}>
+                      <span>
+                        {m && <span className="nr-owner-tag" style={{ background: m.color, marginRight: '8px' }}>{m.emoji} {m.name}</span>}
+                        <strong>{l.title}</strong>
+                      </span>
+                      <span className="nr-xp-pill">+{l.xp} XP</span>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
+            )}
+          </section>
+        )}
+
+        {tab === 'ranking' && (
+          <section>
+            <RankBlock title="🏆 Ranking da semana" subtitle={`${ddmm(wkStart)} – ${ddmm(wkEnd)}`} rows={weekRank} />
+            <RankBlock title="📅 Ranking do mês" subtitle={monthCur.slice(5, 7) + '/' + monthCur.slice(0, 4)} rows={monthRank} />
           </section>
         )}
 
         <footer className="nr-footer">No Rats · seus dados ficam salvos com segurança neste navegador</footer>
       </main>
+    </div>
+  )
+}
+
+function RankBlock({ title, subtitle, rows }) {
+  const hasPts = rows.some((r) => r.pts > 0)
+  return (
+    <div className="nr-panel" style={{ marginBottom: '18px' }}>
+      <div className="nr-rank-head">
+        <h2 className="nr-h" style={{ margin: 0 }}>{title}</h2>
+        <span className="nr-hint">{subtitle}</span>
+      </div>
+      {!hasPts ? (
+        <div className="nr-week-empty" style={{ padding: '8px 0' }}>Ninguém pontuou ainda neste período.</div>
+      ) : (
+        rows.map((r, i) => (
+          <div className="nr-rank-row" key={r.m.id}>
+            <span className="nr-rank-pos">{MEDALS[i] || `${i + 1}º`}</span>
+            <div className="nr-avatar nr-avatar-sm" style={{ background: r.m.color }}>{r.m.emoji}</div>
+            <span className="nr-rank-name">{r.m.name}</span>
+            <span className="nr-rank-pts">{r.pts} XP</span>
+          </div>
+        ))
+      )}
     </div>
   )
 }
@@ -466,8 +511,8 @@ const CSS = `
 body { margin: 0; }
 .nr-app { min-height: 100vh; background: #f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
 .nr-hero { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 48px 20px 66px; text-align: center; color: #fff; }
-.nr-logo { width: 72px; height: 72px; margin: 0 auto; border-radius: 22px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
-.nr-logo svg { width: 44px; height: 44px; color: #fff; }
+.nr-logo { width: 76px; height: 76px; margin: 0 auto; border-radius: 22px; background: #ffffff; border: 1px solid rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(0,0,0,0.22); overflow: hidden; }
+.nr-logo svg { width: 68px; height: 68px; }
 .nr-wordmark { font-size: 34px; font-weight: 800; letter-spacing: -0.025em; margin: 16px 0 6px; }
 .nr-tagline { opacity: 0.88; font-size: 15px; margin: 0; font-weight: 500; }
 .nr-container { max-width: 880px; margin: -38px auto 0; padding: 0 20px 64px; }
@@ -475,6 +520,7 @@ body { margin: 0; }
 .nr-player { position: relative; background: #fff; border: 2px solid #e9ecf2; border-radius: 18px; padding: 18px 14px; cursor: pointer; text-align: center; font-family: inherit; box-shadow: 0 4px 16px rgba(15,23,42,0.06); transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .nr-player:hover { transform: translateY(-2px); }
 .nr-avatar { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 8px; }
+.nr-avatar-sm { width: 34px; height: 34px; font-size: 18px; margin: 0; }
 .nr-player-name { font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 8px; }
 .nr-player-stats { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .nr-xp-pill { background: #eef2ff; color: #4f46e5; font-weight: 700; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
@@ -505,10 +551,10 @@ body { margin: 0; }
 .nr-suggest:hover { border-color: #6366f1; color: #4f46e5; }
 .nr-member-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .nr-member-chip { display: flex; align-items: center; gap: 6px; border: 1.5px solid #e2e8f0; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600; color: #334155; }
-.nr-mini { width: 24px; height: 24px; border: none; border-radius: 50%; background: #f1f5f9; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
-.nr-mini:hover { background: #e2e8f0; }
+.nr-mini { min-width: 30px; height: 30px; border: 1.5px solid #e2e8f0; border-radius: 50%; background: #fff; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; font-family: inherit; }
+.nr-mini:hover { background: #f1f5f9; }
 .nr-toggle { display: inline-flex; background: #e5e9f0; border-radius: 12px; padding: 3px; gap: 2px; margin-bottom: 18px; }
-.nr-toggle button { border: none; background: transparent; padding: 8px 18px; border-radius: 9px; font-weight: 700; font-size: 13px; color: #64748b; cursor: pointer; font-family: inherit; }
+.nr-toggle button { border: none; background: transparent; padding: 8px 16px; border-radius: 9px; font-weight: 700; font-size: 13px; color: #64748b; cursor: pointer; font-family: inherit; }
 .nr-toggle button.active { background: #fff; color: #4f46e5; box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
 .nr-list-title { font-size: 15px; font-weight: 700; color: #334155; margin: 0 0 14px; }
 .nr-tasks { display: grid; gap: 12px; }
@@ -532,10 +578,25 @@ body { margin: 0; }
 .nr-del { background: #f1f5f9; color: #94a3b8; }
 .nr-del:hover { background: #fee2e2; color: #ef4444; }
 .nr-empty { background: #fff; border: 1.5px dashed #cbd5e1; border-radius: 16px; padding: 44px 24px; text-align: center; color: #94a3b8; font-size: 15px; font-weight: 500; }
-.nr-week-day { margin-bottom: 18px; }
-.nr-week-head { font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px; }
+.nr-cal-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 14px; }
+.nr-cal-range { font-weight: 700; font-size: 14px; color: #334155; }
+.nr-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.nr-cal-cell { background: #fff; border: 1.5px solid #e9ecf2; border-radius: 12px; padding: 10px 4px 8px; cursor: pointer; font-family: inherit; text-align: center; transition: all 0.12s ease; }
+.nr-cal-cell:hover { border-color: #cbd5e1; }
+.nr-cal-cell.today { border-color: #c7d2fe; background: #eef2ff; }
+.nr-cal-cell.sel { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.15); }
+.nr-cal-wd { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+.nr-cal-day { font-size: 18px; font-weight: 800; color: #1e293b; margin: 2px 0 5px; }
+.nr-cal-dots { display: flex; gap: 3px; justify-content: center; min-height: 8px; flex-wrap: wrap; }
+.nr-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 .nr-week-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 1px solid #e9ecf2; border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(15,23,42,0.04); font-size: 14px; color: #1e293b; }
-.nr-week-empty { font-size: 13px; color: #cbd5e1; padding: 2px 2px 6px; }
+.nr-week-empty { font-size: 13px; color: #94a3b8; }
+.nr-rank-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.nr-rank-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid #f1f5f9; }
+.nr-rank-row:first-of-type { border-top: none; }
+.nr-rank-pos { font-size: 18px; font-weight: 800; width: 34px; text-align: center; color: #64748b; }
+.nr-rank-name { font-weight: 700; font-size: 15px; color: #1e293b; flex: 1; }
+.nr-rank-pts { font-weight: 800; font-size: 15px; color: #4f46e5; }
 .nr-footer { text-align: center; margin-top: 40px; color: #94a3b8; font-size: 13px; font-weight: 500; }
 .nr-toast { position: fixed; top: 24px; left: 50%; transform: translate(-50%, 0); background: #0f172a; color: #fff; padding: 13px 24px; border-radius: 999px; font-weight: 600; font-size: 14px; box-shadow: 0 14px 36px rgba(0,0,0,0.32); z-index: 1000; animation: nrpop 0.25s ease; max-width: 90vw; text-align: center; }
 @keyframes nrpop { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
