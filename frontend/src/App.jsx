@@ -1,4 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  'https://drhhimvxtqrvuumqhkgr.supabase.co',
+  'eyJhbGci••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'
+)
 
 const FREQUENCIES = {
   diaria: { label: 'Diária', days: 1, xp: 5 },
@@ -40,6 +46,9 @@ function weekStartOf(dateStr) {
 }
 function ddmm(dateStr) {
   return `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`
+}
+function newCode() {
+  return Math.random().toString(36).slice(2, 7).toUpperCase()
 }
 
 function compressImage(file, cb) {
@@ -117,46 +126,150 @@ function RatLogo() {
   )
 }
 
-function defaultState() {
-  const members = [
-    { id: 'm1', name: 'Ana', emoji: '👩', color: COLORS[0], xp: 0, rats: 0 },
-    { id: 'm2', name: 'João', emoji: '👨', color: COLORS[1], xp: 0, rats: 0 },
-  ]
+function seedRoutines(ownerId) {
   const starters = [
-    { title: 'Lavar a louça', freq: 'diaria', ownerId: 'm2' },
-    { title: 'Lavar roupa', freq: 'semanal', ownerId: 'm1' },
-    { title: 'Limpar o banheiro', freq: 'semanal', ownerId: 'm2' },
-    { title: 'Trocar a roupa de cama', freq: 'quinzenal', ownerId: 'm1' },
-    { title: 'Faxina geral', freq: 'mensal', ownerId: 'm2' },
+    { title: 'Lavar a louça', freq: 'diaria' },
+    { title: 'Lavar roupa', freq: 'semanal' },
+    { title: 'Limpar o banheiro', freq: 'semanal' },
+    { title: 'Trocar a roupa de cama', freq: 'quinzenal' },
+    { title: 'Faxina geral', freq: 'mensal' },
   ]
-  const routines = starters.map((s, i) => ({
+  return starters.map((s, i) => ({
     id: 'r' + (Date.now() + i),
     title: s.title,
     freq: s.freq,
     xp: FREQUENCIES[s.freq].xp,
-    ownerId: s.ownerId,
+    ownerId,
     lastDone: null,
     penalized: false,
   }))
-  return { members, leaderId: 'm1', activeId: 'm1', routines, log: [] }
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem('norats_v2')
-    if (raw) {
-      const s = JSON.parse(raw)
-      if (Array.isArray(s.members) && Array.isArray(s.routines)) {
-        if (!Array.isArray(s.log)) s.log = []
-        return s
-      }
+function normalizeData(d) {
+  const safe = d && typeof d === 'object' ? d : {}
+  return {
+    members: Array.isArray(safe.members) ? safe.members : [],
+    leaderId: safe.leaderId || (Array.isArray(safe.members) && safe.members[0] ? safe.members[0].id : null),
+    routines: Array.isArray(safe.routines) ? safe.routines : [],
+    log: Array.isArray(safe.log) ? safe.log : [],
+  }
+}
+
+function traduz(m) {
+  if (/Invalid login credentials/i.test(m)) return 'Email ou senha incorretos.'
+  if (/already registered/i.test(m)) return 'Esse email já tem conta. Faça login.'
+  if (/Email not confirmed/i.test(m)) return 'Confirme seu email antes de entrar (veja sua caixa de entrada).'
+  if (/Password should be/i.test(m)) return 'A senha precisa ter ao menos 6 caracteres.'
+  return m
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState('login')
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const submit = async () => {
+    if (!email.trim() || !pw) return setMsg('Preencha email e senha.')
+    setBusy(true)
+    setMsg('')
+    if (mode === 'login') {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw })
+      if (error) setMsg(traduz(error.message))
+    } else {
+      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: pw })
+      if (error) setMsg(traduz(error.message))
+      else if (!data.session) setMsg('📧 Enviamos um email de confirmação. Confirme e depois faça login.')
     }
-  } catch (e) {}
-  return defaultState()
+    setBusy(false)
+  }
+
+  return (
+    <div className="nr-auth">
+      <div className="nr-auth-card">
+        <div className="nr-logo" style={{ marginBottom: '18px' }}><RatLogo /></div>
+        <h1 className="nr-auth-title">No Rats</h1>
+        <p className="nr-auth-sub">{mode === 'login' ? 'Entre na sua conta' : 'Crie sua conta'}</p>
+        <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="email" placeholder="Seu email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="password" placeholder="Senha (mín. 6 caracteres)" value={pw} onChange={(e) => setPw(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && submit()} />
+        {msg && <div className="nr-auth-msg">{msg}</div>}
+        <button className="nr-btn nr-btn-primary" style={{ width: '100%', marginTop: '6px' }} onClick={submit} disabled={busy}>
+          {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}
+        </button>
+        <button className="nr-linkbtn" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMsg('') }}>
+          {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function HouseholdSetup({ onCreate, onJoin, onLogout }) {
+  const [mode, setMode] = useState('create')
+  const [casa, setCasa] = useState('Minha casa')
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('👩')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const go = async () => {
+    if (!name.trim()) return setMsg('Digite seu nome.')
+    setBusy(true)
+    setMsg('')
+    try {
+      if (mode === 'create') {
+        await onCreate(casa.trim() || 'Minha casa', name.trim(), emoji)
+      } else {
+        if (!code.trim()) { setBusy(false); return setMsg('Digite o código da casa.') }
+        await onJoin(code.trim().toUpperCase(), name.trim(), emoji)
+      }
+    } catch (e) {
+      setMsg(e.message || 'Algo deu errado.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="nr-auth">
+      <div className="nr-auth-card">
+        <div className="nr-logo" style={{ marginBottom: '18px' }}><RatLogo /></div>
+        <h1 className="nr-auth-title">Bem-vindo!</h1>
+        <div className="nr-toggle" style={{ margin: '14px auto 18px' }}>
+          <button className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>Criar casa</button>
+          <button className={mode === 'join' ? 'active' : ''} onClick={() => setMode('join')}>Entrar numa casa</button>
+        </div>
+        {mode === 'create' ? (
+          <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} placeholder="Nome da casa (ex: Casa da Ana)" value={casa} onChange={(e) => setCasa(e.target.value)} />
+        ) : (
+          <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} placeholder="Código da casa (ex: A1B2C)" value={code} onChange={(e) => setCode(e.target.value)} />
+        )}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <select className="nr-emoji-select" value={emoji} onChange={(e) => setEmoji(e.target.value)}>
+            {EMOJIS.map((e) => <option key={e} value={e}>{e}</option>)}
+          </select>
+          <input className="nr-input" style={{ flex: 1 }} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        {msg && <div className="nr-auth-msg">{msg}</div>}
+        <button className="nr-btn nr-btn-primary" style={{ width: '100%', marginTop: '6px' }} onClick={go} disabled={busy}>
+          {busy ? 'Aguarde…' : mode === 'create' ? 'Criar minha casa' : 'Entrar na casa'}
+        </button>
+        <button className="nr-linkbtn" onClick={onLogout}>Sair da conta</button>
+      </div>
+    </div>
+  )
 }
 
 export default function App() {
-  const [state, setState] = useState(loadState)
+  const [session, setSession] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [householdId, setHouseholdId] = useState(null)
+  const [houseCode, setHouseCode] = useState('')
+  const [data, setData] = useState(null)
+  const [activeId, setActiveId] = useState(null)
+
   const [toast, setToast] = useState(null)
   const [tab, setTab] = useState('hoje')
   const [weekOffset, setWeekOffset] = useState(0)
@@ -168,9 +281,11 @@ export default function App() {
   const [rFreq, setRFreq] = useState('semanal')
   const [rXp, setRXp] = useState(15)
   const [rOwner, setROwner] = useState('')
-
   const [pName, setPName] = useState('')
   const [pEmoji, setPEmoji] = useState('🧒')
+
+  const skipSave = useRef(false)
+  const saveTimer = useRef(null)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -178,15 +293,66 @@ export default function App() {
   }
 
   useEffect(() => {
-    try {
-      localStorage.setItem('norats_v2', JSON.stringify(state))
-    } catch (e) {
-      showToast('⚠️ Armazenamento cheio — apague alguns check-ins com foto')
-    }
-  }, [state])
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setAuthReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    return () => sub.subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
-    setState((prev) => {
+    if (!session) {
+      setData(null)
+      setHouseholdId(null)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    ;(async () => {
+      const { data: mem } = await supabase.from('memberships').select('household_id').eq('user_id', session.user.id).maybeSingle()
+      if (!mem) {
+        setHouseholdId(null)
+        setData(null)
+        setLoading(false)
+        return
+      }
+      const { data: hh } = await supabase.from('households').select('id,code,data').eq('id', mem.household_id).maybeSingle()
+      if (hh) {
+        setHouseholdId(hh.id)
+        setHouseCode(hh.code || '')
+        skipSave.current = true
+        setData(normalizeData(hh.data))
+      }
+      setLoading(false)
+    })()
+  }, [session])
+
+  useEffect(() => {
+    if (data && session) {
+      const mine = data.members.find((m) => m.userId === session.user.id)
+      setActiveId((prev) => prev || (mine ? mine.id : data.members[0] && data.members[0].id))
+    }
+  }, [data, session])
+
+  useEffect(() => {
+    if (!householdId || data == null) return
+    if (skipSave.current) {
+      skipSave.current = false
+      return
+    }
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      supabase.from('households').update({ data, updated_at: new Date().toISOString() }).eq('id', householdId).then(({ error }) => {
+        if (error) showToast('⚠️ Não consegui salvar na nuvem')
+      })
+    }, 700)
+  }, [data, householdId])
+
+  useEffect(() => {
+    if (!householdId) return
+    setData((prev) => {
+      if (!prev) return prev
       let changed = false
       const members = prev.members.map((m) => ({ ...m }))
       const routines = prev.routines.map((r) => {
@@ -203,13 +369,73 @@ export default function App() {
       })
       return changed ? { ...prev, members, routines } : prev
     })
-  }, [])
+    // eslint-disable-next-line
+  }, [householdId])
 
-  const { members, leaderId, activeId, routines, log } = state
+  const logout = async () => {
+    await supabase.auth.signOut()
+    setActiveId(null)
+    setHouseCode('')
+  }
+
+  const createHousehold = async (casaName, myName, myEmoji) => {
+    const code = newCode()
+    const myId = 'm' + Date.now()
+    const initData = {
+      members: [{ id: myId, userId: session.user.id, name: myName, emoji: myEmoji, color: COLORS[0], xp: 0, rats: 0 }],
+      leaderId: myId,
+      routines: seedRoutines(myId),
+      log: [],
+    }
+    const { data: hh, error } = await supabase.from('households').insert({ name: casaName, code, data: initData }).select('id,code').single()
+    if (error) throw new Error('Erro ao criar casa: ' + error.message)
+    const { error: e2 } = await supabase.from('memberships').insert({ user_id: session.user.id, household_id: hh.id })
+    if (e2) throw new Error('Erro ao entrar na casa: ' + e2.message)
+    setHouseholdId(hh.id)
+    setHouseCode(hh.code)
+    setActiveId(myId)
+    skipSave.current = true
+    setData(initData)
+    setLoading(false)
+    showToast('🏠 Casa criada! Código: ' + hh.code)
+  }
+
+  const joinHousehold = async (code, myName, myEmoji) => {
+    const { data: hid, error } = await supabase.rpc('join_household', { invite_code: code })
+    if (error) throw new Error('Código inválido ou erro ao entrar.')
+    const { data: hh, error: e2 } = await supabase.from('households').select('id,code,data').eq('id', hid).single()
+    if (e2) throw new Error('Erro ao carregar a casa.')
+    const d = normalizeData(hh.data)
+    let myId = (d.members.find((m) => m.userId === session.user.id) || {}).id
+    if (!myId) {
+      myId = 'm' + Date.now()
+      d.members.push({ id: myId, userId: session.user.id, name: myName, emoji: myEmoji, color: COLORS[d.members.length % COLORS.length], xp: 0, rats: 0 })
+      await supabase.from('households').update({ data: d }).eq('id', hid)
+    }
+    setHouseholdId(hid)
+    setHouseCode(hh.code || '')
+    setActiveId(myId)
+    skipSave.current = true
+    setData(d)
+    setLoading(false)
+    showToast('🏠 Você entrou na casa!')
+  }
+
+  if (!authReady || loading) {
+    return <div className="nr-auth"><div className="nr-spinner">🐭 Carregando…</div></div>
+  }
+  if (!session) return <AuthScreen />
+  if (!householdId || !data) {
+    return <HouseholdSetup onCreate={createHousehold} onJoin={joinHousehold} onLogout={logout} />
+  }
+
+  const members = data.members
+  const leaderId = data.leaderId
+  const routines = data.routines
+  const log = data.log
   const active = members.find((m) => m.id === activeId) || members[0]
   const isLeader = active && active.id === leaderId
 
-  const setActive = (id) => setState((p) => ({ ...p, activeId: id }))
   const setFreqForm = (key) => {
     setRFreq(key)
     setRXp(FREQUENCIES[key].xp)
@@ -223,36 +449,33 @@ export default function App() {
     if (!pName.trim()) return showToast('✏️ Digite o nome!')
     const id = 'm' + Date.now()
     const color = COLORS[members.length % COLORS.length]
-    setState((p) => ({ ...p, members: [...p.members, { id, name: pName.trim(), emoji: pEmoji, color, xp: 0, rats: 0 }] }))
+    setData((p) => ({ ...p, members: [...p.members, { id, name: pName.trim(), emoji: pEmoji, color, xp: 0, rats: 0 }] }))
     setPName('')
     showToast(`👋 ${pName.trim()} entrou na família!`)
   }
 
   const removeMember = (id) => {
     if (members.length <= 1) return showToast('Precisa ter ao menos 1 pessoa.')
-    setState((p) => {
+    setData((p) => {
       const nextMembers = p.members.filter((m) => m.id !== id)
       const nextLeader = p.leaderId === id ? nextMembers[0].id : p.leaderId
-      const nextActive = p.activeId === id ? nextMembers[0].id : p.activeId
       const routines = p.routines.map((r) => (r.ownerId === id ? { ...r, ownerId: nextLeader } : r))
-      return { ...p, members: nextMembers, leaderId: nextLeader, activeId: nextActive, routines }
+      return { ...p, members: nextMembers, leaderId: nextLeader, routines }
     })
+    if (activeId === id) setActiveId(members[0].id)
   }
 
   const makeLeader = (id) => {
-    setState((p) => ({ ...p, leaderId: id }))
+    setData((p) => ({ ...p, leaderId: id }))
     showToast('👑 Novo líder da família!')
   }
 
   const addRoutine = () => {
     if (!rTitle.trim()) return showToast('✏️ Dê um nome para a rotina!')
     const owner = rOwner || leaderId
-    setState((p) => ({
+    setData((p) => ({
       ...p,
-      routines: [
-        ...p.routines,
-        { id: 'r' + Date.now(), title: rTitle.trim(), freq: rFreq, xp: Number(rXp) || FREQUENCIES[rFreq].xp, ownerId: owner, lastDone: null, penalized: false },
-      ],
+      routines: [...p.routines, { id: 'r' + Date.now(), title: rTitle.trim(), freq: rFreq, xp: Number(rXp) || FREQUENCIES[rFreq].xp, ownerId: owner, lastDone: null, penalized: false }],
     }))
     setRTitle('')
     showToast('✅ Rotina criada!')
@@ -271,7 +494,7 @@ export default function App() {
       if (photos.before) entry.before = photos.before
       if (photos.after) entry.after = photos.after
     }
-    setState((p) => ({
+    setData((p) => ({
       ...p,
       members: p.members.map((m) => (m.id === cid ? { ...m, xp: m.xp + routine.xp } : m)),
       routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
@@ -286,9 +509,9 @@ export default function App() {
   }
 
   const updateFreq = (id, newFreq) =>
-    setState((p) => ({ ...p, routines: p.routines.map((r) => (r.id === id ? { ...r, freq: newFreq } : r)) }))
+    setData((p) => ({ ...p, routines: p.routines.map((r) => (r.id === id ? { ...r, freq: newFreq } : r)) }))
   const removeRoutine = (id) =>
-    setState((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
+    setData((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
   const memberById = (id) => members.find((m) => m.id === id)
 
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
@@ -299,9 +522,7 @@ export default function App() {
   const wkEnd = addDays(wkStart, 6)
   const monthCur = today.slice(0, 7)
   const sumPts = (filterFn) =>
-    members
-      .map((m) => ({ m, pts: log.filter((l) => l.memberId === m.id && filterFn(l.date)).reduce((a, l) => a + l.xp, 0) }))
-      .sort((a, b) => b.pts - a.pts)
+    members.map((m) => ({ m, pts: log.filter((l) => l.memberId === m.id && filterFn(l.date)).reduce((a, l) => a + l.xp, 0) })).sort((a, b) => b.pts - a.pts)
   const weekRank = sumPts((d) => d >= wkStart && d <= wkEnd)
   const monthRank = sumPts((d) => d.slice(0, 7) === monthCur)
 
@@ -340,6 +561,7 @@ export default function App() {
       )}
 
       <header className="nr-hero">
+        <button className="nr-logout" onClick={logout}>Sair</button>
         <div className="nr-logo"><RatLogo /></div>
         <h1 className="nr-wordmark">No Rats</h1>
         <p className="nr-tagline">O jogo de manter a casa em ordem — em família</p>
@@ -347,13 +569,13 @@ export default function App() {
 
       <main className="nr-container">
         <div className="nr-field-label" style={{ marginBottom: '12px', fontSize: '15px', color: '#334155' }}>
-          Placar geral <span style={{ color: '#94a3b8', fontWeight: 500 }}>· toque para escolher quem é você</span>
+          Placar geral <span style={{ color: '#94a3b8', fontWeight: 500 }}>· você é {active ? active.name : ''}</span>
         </div>
         <section className="nr-scoreboard">
           {members.map((m) => {
             const isActive = m.id === activeId
             return (
-              <button key={m.id} className="nr-player" onClick={() => setActive(m.id)} style={isActive ? { borderColor: m.color, boxShadow: `0 0 0 3px ${m.color}22` } : undefined}>
+              <button key={m.id} className="nr-player" onClick={() => setActiveId(m.id)} style={isActive ? { borderColor: m.color, boxShadow: `0 0 0 3px ${m.color}22` } : undefined}>
                 <div className="nr-avatar" style={{ background: m.color }}>{m.emoji}</div>
                 <div className="nr-player-name">{m.name} {m.id === leaderId ? '👑' : ''}</div>
                 <div className="nr-player-stats">
@@ -369,11 +591,14 @@ export default function App() {
         {isLeader && (
           <section className="nr-panel">
             <h2 className="nr-h">👑 Família <span className="nr-hint">(só o líder vê isto)</span></h2>
+            <div className="nr-code-box">
+              Código da casa: <strong>{houseCode}</strong> <span className="nr-hint">— compartilhe pra família entrar</span>
+            </div>
             <div className="nr-row">
               <select className="nr-emoji-select" value={pEmoji} onChange={(e) => setPEmoji(e.target.value)}>
                 {EMOJIS.map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
-              <input className="nr-input" type="text" placeholder="Nome da pessoa…" value={pName} onChange={(e) => setPName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addMember()} />
+              <input className="nr-input" type="text" placeholder="Adicionar pessoa (ex: filho)…" value={pName} onChange={(e) => setPName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addMember()} />
               <button className="nr-btn nr-btn-primary" onClick={addMember}>Adicionar</button>
             </div>
             <div className="nr-member-chips">
@@ -555,7 +780,7 @@ export default function App() {
           </section>
         )}
 
-        <footer className="nr-footer">No Rats · seus dados ficam salvos com segurança neste navegador</footer>
+        <footer className="nr-footer">No Rats · dados salvos na nuvem 🔐 · casa {houseCode}</footer>
       </main>
     </div>
   )
@@ -626,7 +851,16 @@ const CSS = `
 * { box-sizing: border-box; }
 body { margin: 0; }
 .nr-app { min-height: 100vh; background: #f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
-.nr-hero { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 48px 20px 66px; text-align: center; color: #fff; }
+.nr-auth { min-height: 100vh; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); display: flex; align-items: center; justify-content: center; padding: 20px; font-family: 'Inter', -apple-system, sans-serif; }
+.nr-auth-card { background: #fff; border-radius: 22px; padding: 32px 26px; width: 100%; max-width: 380px; box-shadow: 0 24px 60px rgba(0,0,0,0.28); text-align: center; }
+.nr-auth-title { font-size: 28px; font-weight: 800; margin: 0 0 4px; color: #1e293b; }
+.nr-auth-sub { font-size: 14px; color: #64748b; margin: 0 0 20px; font-weight: 500; }
+.nr-auth-msg { background: #fef3c7; color: #92400e; border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.nr-linkbtn { background: none; border: none; color: #4f46e5; font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 14px; font-family: inherit; }
+.nr-spinner { color: #fff; font-size: 18px; font-weight: 700; }
+.nr-hero { position: relative; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 48px 20px 66px; text-align: center; color: #fff; }
+.nr-logout { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 12px; cursor: pointer; font-family: inherit; }
+.nr-logout:hover { background: rgba(255,255,255,0.28); }
 .nr-logo { width: 76px; height: 76px; margin: 0 auto; border-radius: 22px; background: #ffffff; border: 1px solid rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(0,0,0,0.22); overflow: hidden; }
 .nr-logo svg { width: 68px; height: 68px; }
 .nr-wordmark { font-size: 34px; font-weight: 800; letter-spacing: -0.025em; margin: 16px 0 6px; }
@@ -645,6 +879,8 @@ body { margin: 0; }
 .nr-panel { background: #fff; border: 1px solid #e9ecf2; border-radius: 18px; padding: 22px; box-shadow: 0 4px 16px rgba(15,23,42,0.06); margin-bottom: 22px; }
 .nr-h { font-size: 15px; font-weight: 700; margin: 0 0 14px; color: #1e293b; }
 .nr-hint { font-weight: 500; font-size: 12px; color: #94a3b8; }
+.nr-code-box { background: #eef2ff; border: 1px dashed #a5b4fc; border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #3730a3; margin-bottom: 14px; }
+.nr-code-box strong { font-size: 16px; letter-spacing: 1px; }
 .nr-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .nr-input { flex: 1; min-width: 160px; padding: 12px 15px; font-size: 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; outline: none; font-family: inherit; transition: border-color 0.15s ease; }
 .nr-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
@@ -656,6 +892,7 @@ body { margin: 0; }
 @media (min-width: 620px) { .nr-form-grid { grid-template-columns: 2fr 1fr 1.3fr; align-items: start; } }
 .nr-field-label { font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 8px; }
 .nr-btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease; white-space: nowrap; }
+.nr-btn:disabled { opacity: 0.6; cursor: default; }
 .nr-btn-sm { padding: 8px 13px; font-size: 12.5px; }
 .nr-btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
 .nr-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgba(79,70,229,0.45); }
