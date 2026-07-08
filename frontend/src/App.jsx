@@ -286,6 +286,7 @@ export default function App() {
 
   const skipSave = useRef(false)
   const saveTimer = useRef(null)
+  const writeIdRef = useRef(null)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -343,7 +344,9 @@ export default function App() {
     }
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      supabase.from('households').update({ data, updated_at: new Date().toISOString() }).eq('id', householdId).then(({ error }) => {
+      const wid = Math.random().toString(36).slice(2)
+      writeIdRef.current = wid
+      supabase.from('households').update({ data: { ...data, _w: wid }, updated_at: new Date().toISOString() }).eq('id', householdId).then(({ error }) => {
         if (error) showToast('⚠️ Não consegui salvar na nuvem')
       })
     }, 700)
@@ -370,6 +373,21 @@ export default function App() {
       return changed ? { ...prev, members, routines } : prev
     })
     // eslint-disable-next-line
+  }, [householdId])
+
+  useEffect(() => {
+    if (!householdId) return
+    const channel = supabase
+      .channel('household-' + householdId)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'households', filter: 'id=eq.' + householdId }, (payload) => {
+        const nd = payload.new && payload.new.data
+        if (!nd) return
+        if (nd._w && nd._w === writeIdRef.current) return
+        skipSave.current = true
+        setData(normalizeData(nd))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [householdId])
 
   const logout = async () => {
