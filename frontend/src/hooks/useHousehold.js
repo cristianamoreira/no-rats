@@ -124,17 +124,18 @@ export function useHousehold(session, showToast) {
       routines: seedRoutines(myId),
       log: [],
     }
-    const { data: hh, error } = await supabase.from('households').insert({ name: casaName, code, data: initData }).select('id,code').single()
+    // create_household is a SECURITY DEFINER RPC that inserts the household and the
+    // creator's membership atomically, so the client never needs a permissive
+    // direct-insert policy on households/memberships.
+    const { data: hid, error } = await supabase.rpc('create_household', { house_name: casaName, invite_code: code, init_data: initData })
     if (error) throw new Error('Erro ao criar casa: ' + error.message)
-    const { error: e2 } = await supabase.from('memberships').insert({ user_id: session.user.id, household_id: hh.id })
-    if (e2) throw new Error('Erro ao entrar na casa: ' + e2.message)
-    setHouseholdId(hh.id)
-    setHouseCode(hh.code)
+    setHouseholdId(hid)
+    setHouseCode(code)
     setActiveId(myId)
     skipSave.current = true
     setData(initData)
     setLoading(false)
-    showToast('🏠 Casa criada! Código: ' + hh.code)
+    showToast('🏠 Casa criada! Código: ' + code)
   }
 
   const joinHousehold = async (code, myName, myEmoji) => {
