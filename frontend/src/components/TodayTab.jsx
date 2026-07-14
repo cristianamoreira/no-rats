@@ -2,7 +2,7 @@ import { FREQUENCIES } from '../lib/constants'
 import { todayStr } from '../lib/dates'
 import { getStatus } from '../lib/routines'
 
-export default function TodayTab({ routines, members, active, isLeader, onOpenCheckin, onComplete, onUpdateFreq, onRemoveRoutine }) {
+export default function TodayTab({ routines, members, me, isLeader, onOpenCheckin, onComplete, onUpdateFreq, onRemoveRoutine }) {
   const memberById = (id) => members.find((m) => m.id === id)
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
   withStatus.sort((a, b) => b.status.sort - a.status.sort)
@@ -16,16 +16,21 @@ export default function TodayTab({ routines, members, active, isLeader, onOpenCh
         <div className="nr-tasks">
           {withStatus.map((r) => {
             const s = r.status
-            const owner = memberById(r.ownerId)
+            const free = !r.ownerId
+            const owner = free ? null : memberById(r.ownerId)
             const doneToday = r.lastDone === todayStr()
-            const ownerIsActive = active && active.id === r.ownerId
+            const mine = me && r.ownerId === me.id
             return (
               <div className="nr-task" key={r.id} style={{ borderLeftColor: s.color }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="nr-task-head">
                     <span className="nr-task-title">{r.title}</span>
                     <span className="nr-status" style={{ background: s.color }}>{s.label}</span>
-                    {owner && <span className="nr-owner-tag" style={{ background: owner.color }}>{owner.emoji} {owner.name}</span>}
+                    {free ? (
+                      <span className="nr-owner-tag" style={{ background: '#64748b' }}>🎯 Livre</span>
+                    ) : owner ? (
+                      <span className="nr-owner-tag" style={{ background: owner.color }}>{owner.emoji} {owner.name}</span>
+                    ) : null}
                   </div>
                   <div className="nr-meta">{s.last}{s.sub ? ` · ${s.sub}` : ''} · vale {r.xp} XP</div>
                   {isLeader && (
@@ -43,13 +48,10 @@ export default function TodayTab({ routines, members, active, isLeader, onOpenCh
                   )}
                   {doneToday ? (
                     <button className="nr-btn nr-done-today">✓ Feita hoje</button>
-                  ) : ownerIsActive ? (
-                    <button className="nr-btn nr-complete" onClick={() => onComplete(r.id)}>Fiz hoje</button>
+                  ) : free || mine ? (
+                    <button className="nr-btn nr-complete" onClick={() => onComplete(r.id)}>{mine ? 'Fiz hoje' : 'Fiz eu'}</button>
                   ) : (
-                    <>
-                      <button className="nr-btn nr-complete nr-btn-sm" onClick={() => onComplete(r.id)}>Feita</button>
-                      <button className="nr-btn nr-steal nr-btn-sm" onClick={() => onComplete(r.id, active.id)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Fiz eu</button>
-                    </>
+                    <button className="nr-btn nr-steal" onClick={() => onComplete(r.id)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Fiz eu</button>
                   )}
                   {isLeader && <button className="nr-btn nr-del" title="Excluir" onClick={() => onRemoveRoutine(r.id)}>🗑️</button>}
                 </div>
