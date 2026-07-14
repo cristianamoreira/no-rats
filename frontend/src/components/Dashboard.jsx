@@ -9,7 +9,7 @@ import RankingTab from './RankingTab'
 import CheckinModal from './CheckinModal'
 import Lightbox from './Lightbox'
 
-export default function Dashboard({ hh }) {
+export default function Dashboard({ hh, showToast }) {
   const { data, houseCode, me } = hh
   const [tab, setTab] = useState('hoje')
   const [modalRoutine, setModalRoutine] = useState(null)
@@ -57,6 +57,7 @@ export default function Dashboard({ hh }) {
             houseCode={houseCode}
             onRemoveMember={hh.removeMember}
             onMakeLeader={hh.makeLeader}
+            showToast={showToast}
           />
         )}
 
