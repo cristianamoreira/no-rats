@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { FREQUENCIES, SUGGESTIONS } from '../lib/constants'
 
-export default function NewRoutinePanel({ members, leaderId, onAdd }) {
+export default function NewRoutinePanel({ members, onAdd }) {
   const [rTitle, setRTitle] = useState('')
   const [rFreq, setRFreq] = useState('semanal')
   const [rXp, setRXp] = useState(15)
-  const [rOwner, setROwner] = useState('')
+  const [rOwner, setROwner] = useState('') // '' = Livre
 
   const setFreqForm = (key) => {
     setRFreq(key)
@@ -16,7 +16,7 @@ export default function NewRoutinePanel({ members, leaderId, onAdd }) {
     setFreqForm(sug.freq)
   }
   const submit = () => {
-    onAdd({ title: rTitle, freq: rFreq, xp: rXp, ownerId: rOwner || leaderId })
+    onAdd({ title: rTitle, freq: rFreq, xp: rXp, ownerId: rOwner || null })
     if (rTitle.trim()) setRTitle('')
   }
 
@@ -42,7 +42,8 @@ export default function NewRoutinePanel({ members, leaderId, onAdd }) {
         </div>
         <div>
           <div className="nr-field-label">De quem é?</div>
-          <select className="nr-owner-select" value={rOwner || leaderId} onChange={(e) => setROwner(e.target.value)}>
+          <select className="nr-owner-select" value={rOwner} onChange={(e) => setROwner(e.target.value)}>
+            <option value="">🎯 Livre (qualquer um)</option>
             {members.map((m) => <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
           </select>
         </div>

@@ -10,8 +10,6 @@ export function useHousehold(session, showToast) {
   const [householdId, setHouseholdId] = useState(null)
   const [houseCode, setHouseCode] = useState('')
   const [data, setData] = useState(null)
-  const [activeId, setActiveId] = useState(null)
-
   const skipSave = useRef(false)
   const saveTimer = useRef(null)
   const writeIdRef = useRef(null)
@@ -44,14 +42,6 @@ export function useHousehold(session, showToast) {
     })()
   }, [session])
 
-  // Pick the active member (yours by default) once data is available.
-  useEffect(() => {
-    if (data && session) {
-      const mine = data.members.find((m) => m.userId === session.user.id)
-      setActiveId((prev) => prev || (mine ? mine.id : data.members[0] && data.members[0].id))
-    }
-  }, [data, session])
-
   // Debounced save to the cloud, tagged with a write id so realtime can ignore our own echo.
   useEffect(() => {
     if (!householdId || data == null) return
@@ -78,7 +68,7 @@ export function useHousehold(session, showToast) {
       const members = prev.members.map((m) => ({ ...m }))
       const routines = prev.routines.map((r) => {
         const st = getStatus(r)
-        if (st.kind === 'late' && !r.penalized) {
+        if (st.kind === 'late' && !r.penalized && r.ownerId) {
           const owner = members.find((m) => m.id === r.ownerId)
           if (owner) {
             owner.rats += 1
@@ -111,7 +101,6 @@ export function useHousehold(session, showToast) {
 
   const logout = async () => {
     await supabase.auth.signOut()
-    setActiveId(null)
     setHouseCode('')
   }
 
@@ -121,7 +110,7 @@ export function useHousehold(session, showToast) {
     const initData = {
       members: [{ id: myId, userId: session.user.id, name: myName, emoji: myEmoji, color: COLORS[0], xp: 0, rats: 0 }],
       leaderId: myId,
-      routines: seedRoutines(myId),
+      routines: seedRoutines(),
       log: [],
     }
     // create_household is a SECURITY DEFINER RPC that inserts the household and the
@@ -131,7 +120,6 @@ export function useHousehold(session, showToast) {
     if (error) throw new Error('Erro ao criar casa: ' + error.message)
     setHouseholdId(hid)
     setHouseCode(code)
-    setActiveId(myId)
     skipSave.current = true
     setData(initData)
     setLoading(false)
@@ -152,22 +140,10 @@ export function useHousehold(session, showToast) {
     }
     setHouseholdId(hid)
     setHouseCode(hh.code || '')
-    setActiveId(myId)
     skipSave.current = true
     setData(d)
     setLoading(false)
     showToast('🏠 Você entrou na casa!')
-  }
-
-  const addMember = (name, emoji) => {
-    const n = (name || '').trim()
-    if (!n) return showToast('✏️ Digite o nome!')
-    setData((p) => {
-      const id = 'm' + Date.now()
-      const color = COLORS[p.members.length % COLORS.length]
-      return { ...p, members: [...p.members, { id, name: n, emoji, color, xp: 0, rats: 0 }] }
-    })
-    showToast(`👋 ${n} entrou na família!`)
   }
 
   const removeMember = (id) => {
@@ -175,10 +151,9 @@ export function useHousehold(session, showToast) {
     setData((p) => {
       const nextMembers = p.members.filter((m) => m.id !== id)
       const nextLeader = p.leaderId === id ? nextMembers[0].id : p.leaderId
-      const routines = p.routines.map((r) => (r.ownerId === id ? { ...r, ownerId: nextLeader } : r))
+      const routines = p.routines.map((r) => (r.ownerId === id ? { ...r, ownerId: null } : r))
       return { ...p, members: nextMembers, leaderId: nextLeader, routines }
     })
-    if (activeId === id) setActiveId(data.members[0].id)
   }
 
   const makeLeader = (id) => {
@@ -191,35 +166,35 @@ export function useHousehold(session, showToast) {
     if (!t) return showToast('✏️ Dê um nome para a rotina!')
     setData((p) => ({
       ...p,
-      routines: [...p.routines, { id: 'r' + Date.now(), title: t, freq, xp: Number(xp) || FREQUENCIES[freq].xp, ownerId: ownerId || p.leaderId, lastDone: null, penalized: false }],
+      routines: [...p.routines, { id: 'r' + Date.now(), title: t, freq, xp: Number(xp) || FREQUENCIES[freq].xp, ownerId: ownerId || null, lastDone: null, penalized: false }],
     }))
     showToast('✅ Rotina criada!')
   }
 
-  const completeTask = (id, creditId, photos) => {
+  const completeTask = (id, photos) => {
     const today = todayStr()
     const routine = data.routines.find((r) => r.id === id)
     if (!routine) return
     if (routine.lastDone === today) return showToast('✨ Já registrada hoje!')
-    const owner = data.members.find((m) => m.id === routine.ownerId)
-    const cid = creditId || routine.ownerId
-    const credit = data.members.find((m) => m.id === cid)
-    const entry = { id: 'l' + Date.now(), memberId: cid, title: routine.title, xp: routine.xp, date: today }
+    const me = data.members.find((m) => m.userId === session.user.id)
+    if (!me) return
+    const owner = routine.ownerId ? data.members.find((m) => m.id === routine.ownerId) : null
+    const entry = { id: 'l' + Date.now(), memberId: me.id, title: routine.title, xp: routine.xp, date: today }
     if (photos) {
       if (photos.before) entry.before = photos.before
       if (photos.after) entry.after = photos.after
     }
     setData((p) => ({
       ...p,
-      members: p.members.map((m) => (m.id === cid ? { ...m, xp: m.xp + routine.xp } : m)),
+      members: p.members.map((m) => (m.id === me.id ? { ...m, xp: m.xp + routine.xp } : m)),
       routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
       log: [...p.log, entry],
     }))
     const photoTag = photos && (photos.before || photos.after) ? ' 📸' : ''
-    if (owner && cid !== owner.id) {
-      showToast(`🥷 ${credit.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP${photoTag}`)
+    if (owner && owner.id !== me.id) {
+      showToast(`🥷 ${me.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP${photoTag}`)
     } else {
-      showToast(`✅ +${routine.xp} XP para ${credit ? credit.name : 'a casa'}${photoTag}`)
+      showToast(`✅ +${routine.xp} XP para ${me.name}${photoTag}`)
     }
   }
 
@@ -228,17 +203,17 @@ export function useHousehold(session, showToast) {
   const removeRoutine = (id) =>
     setData((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
 
+  const me = data && session ? data.members.find((m) => m.userId === session.user.id) : undefined
+
   return {
     loading,
     householdId,
     houseCode,
     data,
-    activeId,
-    setActiveId,
+    me,
     createHousehold,
     joinHousehold,
     logout,
-    addMember,
     removeMember,
     makeLeader,
     addRoutine,

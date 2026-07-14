@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { compressImage } from '../lib/image'
 
-export default function CheckinModal({ routine, members, defaultCredit, onConfirm, onClose }) {
+export default function CheckinModal({ routine, onConfirm, onClose }) {
   const [before, setBefore] = useState(null)
   const [after, setAfter] = useState(null)
-  const [credit, setCredit] = useState(defaultCredit)
   const pick = (setter) => (e) => {
     const f = e.target.files && e.target.files[0]
     if (f) compressImage(f, setter)
@@ -24,13 +23,9 @@ export default function CheckinModal({ routine, members, defaultCredit, onConfir
             <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={pick(setAfter)} />
           </label>
         </div>
-        <div className="nr-field-label" style={{ marginTop: '16px' }}>Quem fez?</div>
-        <select className="nr-owner-select" value={credit} onChange={(e) => setCredit(e.target.value)}>
-          {members.map((m) => <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
-        </select>
         <div className="nr-modal-actions">
           <button className="nr-btn nr-del" onClick={onClose}>Cancelar</button>
-          <button className="nr-btn nr-btn-primary" onClick={() => onConfirm(credit, { before, after })}>Registrar check-in</button>
+          <button className="nr-btn nr-btn-primary" onClick={() => onConfirm({ before, after })}>Registrar check-in</button>
         </div>
       </div>
     </div>

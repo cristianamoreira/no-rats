@@ -9,8 +9,8 @@ import RankingTab from './RankingTab'
 import CheckinModal from './CheckinModal'
 import Lightbox from './Lightbox'
 
-export default function Dashboard({ hh }) {
-  const { data, houseCode, activeId, setActiveId } = hh
+export default function Dashboard({ hh, showToast }) {
+  const { data, houseCode, me } = hh
   const [tab, setTab] = useState('hoje')
   const [modalRoutine, setModalRoutine] = useState(null)
   const [lightbox, setLightbox] = useState(null)
@@ -19,18 +19,15 @@ export default function Dashboard({ hh }) {
   const leaderId = data.leaderId
   const routines = data.routines
   const log = data.log
-  const active = members.find((m) => m.id === activeId) || members[0]
-  const isLeader = active && active.id === leaderId
+  const isLeader = me && me.id === leaderId
 
   return (
     <div className="nr-app">
       {modalRoutine && (
         <CheckinModal
           routine={modalRoutine}
-          members={members}
-          defaultCredit={modalRoutine.ownerId}
-          onConfirm={(cid, photos) => {
-            hh.completeTask(modalRoutine.id, cid, photos)
+          onConfirm={(photos) => {
+            hh.completeTask(modalRoutine.id, photos)
             setModalRoutine(null)
           }}
           onClose={() => setModalRoutine(null)}
@@ -48,24 +45,24 @@ export default function Dashboard({ hh }) {
 
       <main className="nr-container">
         <div className="nr-field-label" style={{ marginBottom: '12px', fontSize: '15px', color: '#334155' }}>
-          Placar geral <span style={{ color: '#94a3b8', fontWeight: 500 }}>· você é {active ? active.name : ''}</span>
+          Placar geral <span style={{ color: '#94a3b8', fontWeight: 500 }}>· você é {me ? me.name : ''}</span>
         </div>
 
-        <Scoreboard members={members} leaderId={leaderId} activeId={activeId} onSelect={setActiveId} />
+        <Scoreboard members={members} leaderId={leaderId} meId={me && me.id} />
 
         {isLeader && (
           <FamilyPanel
             members={members}
             leaderId={leaderId}
             houseCode={houseCode}
-            onAddMember={hh.addMember}
             onRemoveMember={hh.removeMember}
             onMakeLeader={hh.makeLeader}
+            showToast={showToast}
           />
         )}
 
         {isLeader && (
-          <NewRoutinePanel members={members} leaderId={leaderId} onAdd={hh.addRoutine} />
+          <NewRoutinePanel members={members} onAdd={hh.addRoutine} />
         )}
 
         <div className="nr-toggle">
@@ -78,7 +75,7 @@ export default function Dashboard({ hh }) {
           <TodayTab
             routines={routines}
             members={members}
-            active={active}
+            me={me}
             isLeader={isLeader}
             onOpenCheckin={setModalRoutine}
             onComplete={hh.completeTask}
