@@ -20,7 +20,7 @@ export function getStatus(routine) {
   return { kind: 'late', color: '#ef4444', label: `Atrasada há ${over} ${over === 1 ? 'dia' : 'dias'}`, last, sort: over }
 }
 
-export function seedRoutines(ownerId) {
+export function seedRoutines() {
   const starters = [
     { title: 'Lavar a louça', freq: 'diaria' },
     { title: 'Lavar roupa', freq: 'semanal' },
@@ -33,7 +33,7 @@ export function seedRoutines(ownerId) {
     title: s.title,
     freq: s.freq,
     xp: FREQUENCIES[s.freq].xp,
-    ownerId,
+    ownerId: null,
     lastDone: null,
     penalized: false,
   }))

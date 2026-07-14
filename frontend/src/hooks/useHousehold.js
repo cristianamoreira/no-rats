@@ -78,7 +78,7 @@ export function useHousehold(session, showToast) {
       const members = prev.members.map((m) => ({ ...m }))
       const routines = prev.routines.map((r) => {
         const st = getStatus(r)
-        if (st.kind === 'late' && !r.penalized) {
+        if (st.kind === 'late' && !r.penalized && r.ownerId) {
           const owner = members.find((m) => m.id === r.ownerId)
           if (owner) {
             owner.rats += 1
@@ -121,7 +121,7 @@ export function useHousehold(session, showToast) {
     const initData = {
       members: [{ id: myId, userId: session.user.id, name: myName, emoji: myEmoji, color: COLORS[0], xp: 0, rats: 0 }],
       leaderId: myId,
-      routines: seedRoutines(myId),
+      routines: seedRoutines(),
       log: [],
     }
     // create_household is a SECURITY DEFINER RPC that inserts the household and the
@@ -175,7 +175,7 @@ export function useHousehold(session, showToast) {
     setData((p) => {
       const nextMembers = p.members.filter((m) => m.id !== id)
       const nextLeader = p.leaderId === id ? nextMembers[0].id : p.leaderId
-      const routines = p.routines.map((r) => (r.ownerId === id ? { ...r, ownerId: nextLeader } : r))
+      const routines = p.routines.map((r) => (r.ownerId === id ? { ...r, ownerId: null } : r))
       return { ...p, members: nextMembers, leaderId: nextLeader, routines }
     })
     if (activeId === id) setActiveId(data.members[0].id)
@@ -191,7 +191,7 @@ export function useHousehold(session, showToast) {
     if (!t) return showToast('✏️ Dê um nome para a rotina!')
     setData((p) => ({
       ...p,
-      routines: [...p.routines, { id: 'r' + Date.now(), title: t, freq, xp: Number(xp) || FREQUENCIES[freq].xp, ownerId: ownerId || p.leaderId, lastDone: null, penalized: false }],
+      routines: [...p.routines, { id: 'r' + Date.now(), title: t, freq, xp: Number(xp) || FREQUENCIES[freq].xp, ownerId: ownerId || null, lastDone: null, penalized: false }],
     }))
     showToast('✅ Rotina criada!')
   }
