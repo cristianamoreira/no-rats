@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { EMOJIS } from '../lib/constants'
 import RatLogo from './RatLogo'
 
-export default function HouseholdSetup({ onCreate, onJoin, onLogout, initialCode = '', initialMode = 'create' }) {
+export default function HouseholdSetup({ onCreate, onJoin, onLogout, initialCode = '', initialMode = 'create', initialName = '' }) {
   const [mode, setMode] = useState(initialMode)
   const [casa, setCasa] = useState('Minha casa')
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [emoji, setEmoji] = useState('👩')
   const [code, setCode] = useState(initialCode)
   const [busy, setBusy] = useState(false)

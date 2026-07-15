@@ -5,12 +5,14 @@ import RatLogo from './RatLogo'
 
 export default function AuthScreen() {
   const [mode, setMode] = useState('login')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
   const submit = async () => {
+    if (mode === 'signup' && !name.trim()) return setMsg('Digite seu nome.')
     if (!email.trim() || !pw) return setMsg('Preencha email e senha.')
     setBusy(true)
     setMsg('')
@@ -18,11 +20,23 @@ export default function AuthScreen() {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw })
       if (error) setMsg(traduz(error.message))
     } else {
-      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: pw })
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: pw,
+        options: {
+          data: { name: name.trim() },
+          emailRedirectTo: window.location.origin,
+        },
+      })
       if (error) setMsg(traduz(error.message))
-      else if (!data.session) setMsg('📧 Enviamos um email de confirmação. Confirme e depois faça login.')
+      else if (!data.session) setMsg('📧 Enviamos um e-mail de confirmação para a sua caixa de entrada. Confira também o spam e clique no link para ativar sua conta.')
     }
     setBusy(false)
+  }
+
+  const toggleMode = () => {
+    setMode(mode === 'login' ? 'signup' : 'login')
+    setMsg('')
   }
 
   return (
@@ -42,13 +56,16 @@ export default function AuthScreen() {
         <div className="nr-auth-card">
           <h2 className="nr-auth-title">{mode === 'login' ? 'Entrar' : 'Criar conta'}</h2>
           <p className="nr-auth-sub">{mode === 'login' ? 'Bem-vindo de volta ao placar.' : 'Leva menos de um minuto.'}</p>
+          {mode === 'signup' && (
+            <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="text" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
+          )}
           <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="email" placeholder="Seu email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="password" placeholder="Senha (mín. 6 caracteres)" value={pw} onChange={(e) => setPw(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && submit()} />
           {msg && <div className="nr-auth-msg">{msg}</div>}
           <button className="nr-btn nr-btn-primary" style={{ width: '100%', marginTop: '6px' }} onClick={submit} disabled={busy}>
             {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar no jogo' : 'Criar minha conta'}
           </button>
-          <button className="nr-linkbtn" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMsg('') }}>
+          <button className="nr-linkbtn" onClick={toggleMode}>
             {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
           </button>
         </div>

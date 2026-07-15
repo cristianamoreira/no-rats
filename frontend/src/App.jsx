@@ -48,6 +48,7 @@ export default function App() {
         onLogout={hh.logout}
         initialCode={inviteCode}
         initialMode={inviteCode ? 'join' : 'create'}
+        initialName={(session && session.user && session.user.user_metadata && session.user.user_metadata.name) || ''}
       />
     )
   } else {
