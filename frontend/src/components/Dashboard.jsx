@@ -39,13 +39,13 @@ export default function Dashboard({ hh, showToast }) {
       <header className="nr-hero">
         <button className="nr-logout" onClick={hh.logout}>Sair</button>
         <div className="nr-logo"><RatLogo /></div>
-        <h1 className="nr-wordmark">No Rats</h1>
-        <p className="nr-tagline">O jogo de manter a casa em ordem — em família</p>
+        <h1 className="nr-wordmark">No <em>Rats</em></h1>
+        <p className="nr-tagline">O jogo de manter a casa em ordem, em família</p>
       </header>
 
       <main className="nr-container">
-        <div className="nr-field-label" style={{ marginBottom: '12px', fontSize: '15px', color: '#334155' }}>
-          Placar geral <span style={{ color: '#94a3b8', fontWeight: 500 }}>· você é {me ? me.name : ''}</span>
+        <div className="nr-field-label" style={{ marginBottom: '12px', fontSize: '16px', color: '#221F2B' }}>
+          Placar geral <span style={{ color: '#8C8794', fontWeight: 500, fontFamily: "'Inter', sans-serif" }}>· você é {me ? me.name : ''}</span>
         </div>
 
         <Scoreboard members={members} leaderId={leaderId} meId={me && me.id} />

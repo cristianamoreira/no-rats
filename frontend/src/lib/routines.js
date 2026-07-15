@@ -5,7 +5,7 @@ export function getStatus(routine) {
   const freq = FREQUENCIES[routine.freq] || FREQUENCIES.semanal
   const ds = daysSince(routine.lastDone)
   if (ds === null) {
-    return { kind: 'none', color: '#94a3b8', label: 'Sem registro', last: 'Nunca registrada', sort: -0.4 }
+    return { kind: 'none', color: '#8C93A1', label: 'Sem registro', last: 'Nunca registrada', sort: -0.4 }
   }
   let last
   if (ds === 0) last = 'Última vez: hoje'
@@ -13,11 +13,11 @@ export function getStatus(routine) {
   else last = `Última vez: há ${ds} dias`
   if (ds < freq.days) {
     const rem = freq.days - ds
-    return { kind: 'ok', color: '#10b981', label: 'Em dia', last, sub: `Próxima em ${rem} ${rem === 1 ? 'dia' : 'dias'}`, sort: -(rem) }
+    return { kind: 'ok', color: '#2FA46B', label: 'Em dia', last, sub: `Próxima em ${rem} ${rem === 1 ? 'dia' : 'dias'}`, sort: -(rem) }
   }
   const over = ds - freq.days
-  if (over === 0) return { kind: 'due', color: '#f59e0b', label: 'Vence hoje', last, sort: 0 }
-  return { kind: 'late', color: '#ef4444', label: `Atrasada há ${over} ${over === 1 ? 'dia' : 'dias'}`, last, sort: over }
+  if (over === 0) return { kind: 'due', color: '#F4A72B', label: 'Vence hoje', last, sort: 0 }
+  return { kind: 'late', color: '#E5484D', label: `Atrasada há ${over} ${over === 1 ? 'dia' : 'dias'}`, last, sort: over }
 }
 
 export function seedRoutines() {

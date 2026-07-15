@@ -32,7 +32,7 @@ export default function NewRoutinePanel({ members, onAdd }) {
           <div className="nr-field-label">Frequência</div>
           <div className="nr-pills">
             {Object.entries(FREQUENCIES).map(([key, f]) => (
-              <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' } : undefined}>{f.label}</button>
+              <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? { background: '#F4A72B', borderColor: '#221F2B', color: '#221F2B', boxShadow: '2px 2px 0 #221F2B' } : undefined}>{f.label}</button>
             ))}
           </div>
         </div>

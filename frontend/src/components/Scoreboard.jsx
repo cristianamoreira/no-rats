@@ -9,7 +9,7 @@ export default function Scoreboard({ members, leaderId, meId }) {
             <div className="nr-player-name">{m.name} {m.id === leaderId ? '👑' : ''}</div>
             <div className="nr-player-stats">
               <span className="nr-xp-pill">{m.xp} XP</span>
-              <span className="nr-rat-pill" style={m.rats > 0 ? { background: '#fee2e2', color: '#ef4444' } : undefined}>🐀 {m.rats}</span>
+              <span className="nr-rat-pill" style={m.rats > 0 ? { background: '#FBE3E3', color: '#E5484D' } : undefined}>🐀 {m.rats}</span>
             </div>
             {isMe && <div className="nr-you">você</div>}
           </div>

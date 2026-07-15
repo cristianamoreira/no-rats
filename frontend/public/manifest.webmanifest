@@ -1,0 +1,13 @@
+{
+  "name": "No Rats",
+  "short_name": "No Rats",
+  "description": "O jogo de manter a casa em ordem, em família.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF6EC",
+  "theme_color": "#221F2B",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
