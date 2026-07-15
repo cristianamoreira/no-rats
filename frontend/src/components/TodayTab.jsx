@@ -61,7 +61,7 @@ export default function TodayTab({ routines, members, me, isLeader, onOpenChecki
                       <button className="nr-btn nr-del nr-btn-sm" title="Desfazer marcação" onClick={() => onUndo(r.id)}>↩️ Desfazer</button>
                     </>
                   ) : free || mine ? (
-                    <button className="nr-btn nr-complete" onClick={() => onOpenCheckin(r)}>📸 Fiz hoje</button>
+                    <button className="nr-btn nr-complete" onClick={() => onOpenCheckin(r)}>📸 Feito por mim</button>
                   ) : (
                     <button className="nr-btn nr-steal" onClick={() => onOpenCheckin(r)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Feito por mim</button>
                   )}
