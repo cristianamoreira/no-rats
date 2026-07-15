@@ -1,11 +1,22 @@
 import { FREQUENCIES } from '../lib/constants'
 import { todayStr } from '../lib/dates'
-import { getStatus } from '../lib/routines'
+import { getStatus, freqLabel } from '../lib/routines'
 
-export default function TodayTab({ routines, members, me, isLeader, onOpenCheckin, onComplete, onUpdateFreq, onRemoveRoutine }) {
+export default function TodayTab({ routines, members, me, isLeader, onOpenCheckin, onUndo, onUpdateFreq, onRemoveRoutine }) {
   const memberById = (id) => members.find((m) => m.id === id)
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
   withStatus.sort((a, b) => b.status.sort - a.status.sort)
+
+  const changeFreq = (r, value) => {
+    if (value === 'custom') {
+      const cur = r.freq === 'custom' ? r.customDays : 10
+      const ans = window.prompt('A cada quantos dias?', String(cur || 10))
+      if (ans === null) return
+      onUpdateFreq(r.id, 'custom', Math.max(1, Math.round(Number(ans)) || 7))
+    } else {
+      onUpdateFreq(r.id, value)
+    }
+  }
 
   return (
     <section>
@@ -27,33 +38,34 @@ export default function TodayTab({ routines, members, me, isLeader, onOpenChecki
                     <span className="nr-task-title">{r.title}</span>
                     <span className="nr-status" style={{ background: s.color }}>{s.label}</span>
                     {free ? (
-                      <span className="nr-owner-tag" style={{ background: '#64748b' }}>🎯 Livre</span>
+                      <span className="nr-owner-tag" style={{ background: '#8C93A1' }}>🎯 Livre</span>
                     ) : owner ? (
                       <span className="nr-owner-tag" style={{ background: owner.color }}>{owner.emoji} {owner.name}</span>
                     ) : null}
                   </div>
-                  <div className="nr-meta">{s.last}{s.sub ? ` · ${s.sub}` : ''} · vale {r.xp} XP</div>
+                  <div className="nr-meta">{s.last}{s.sub ? ` · ${s.sub}` : ''} · {freqLabel(r)} · vale {r.xp} XP</div>
                   {isLeader && (
                     <div className="nr-freq-row">
                       <span className="nr-freq-lbl">Frequência:</span>
-                      <select className="nr-freq" value={r.freq} onChange={(e) => onUpdateFreq(r.id, e.target.value)}>
+                      <select className="nr-freq" value={r.freq === 'custom' ? 'custom' : r.freq} onChange={(e) => changeFreq(r, e.target.value)}>
                         {Object.entries(FREQUENCIES).map(([key, f]) => <option key={key} value={key}>{f.label}</option>)}
+                        <option value="custom">{r.freq === 'custom' ? freqLabel(r) : 'Personalizada…'}</option>
                       </select>
                     </div>
                   )}
                 </div>
                 <div className="nr-actions">
-                  {!doneToday && (
-                    <button className="nr-btn nr-photo-btn nr-btn-sm" title="Check-in com foto" onClick={() => onOpenCheckin(r)}>📸</button>
-                  )}
                   {doneToday ? (
-                    <button className="nr-btn nr-done-today">✓ Feita hoje</button>
+                    <>
+                      <button className="nr-btn nr-done-today">✓ Feita hoje</button>
+                      <button className="nr-btn nr-del nr-btn-sm" title="Desfazer marcação" onClick={() => onUndo(r.id)}>↩️ Desfazer</button>
+                    </>
                   ) : free || mine ? (
-                    <button className="nr-btn nr-complete" onClick={() => onComplete(r.id)}>{mine ? 'Fiz hoje' : 'Fiz eu'}</button>
+                    <button className="nr-btn nr-complete" onClick={() => onOpenCheckin(r)}>📸 Fiz hoje</button>
                   ) : (
-                    <button className="nr-btn nr-steal" onClick={() => onComplete(r.id)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Fiz eu</button>
+                    <button className="nr-btn nr-steal" onClick={() => onOpenCheckin(r)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Fiz eu</button>
                   )}
-                  {isLeader && <button className="nr-btn nr-del" title="Excluir" onClick={() => onRemoveRoutine(r.id)}>🗑️</button>}
+                  {isLeader && <button className="nr-btn nr-del nr-btn-sm" title="Excluir" onClick={() => onRemoveRoutine(r.id)}>🗑️</button>}
                 </div>
               </div>
             )

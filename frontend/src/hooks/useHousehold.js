@@ -161,13 +161,20 @@ export function useHousehold(session, showToast) {
     showToast('👑 Novo líder da família!')
   }
 
-  const addRoutine = ({ title, freq, xp, ownerId }) => {
+  const addRoutine = ({ title, freq, xp, ownerId, customDays }) => {
     const t = (title || '').trim()
     if (!t) return showToast('✏️ Dê um nome para a rotina!')
-    setData((p) => ({
-      ...p,
-      routines: [...p.routines, { id: 'r' + Date.now(), title: t, freq, xp: Number(xp) || FREQUENCIES[freq].xp, ownerId: ownerId || null, lastDone: null, penalized: false }],
-    }))
+    const routine = {
+      id: 'r' + Date.now(),
+      title: t,
+      freq,
+      xp: Number(xp) || (FREQUENCIES[freq] && FREQUENCIES[freq].xp) || 15,
+      ownerId: ownerId || null,
+      lastDone: null,
+      penalized: false,
+    }
+    if (freq === 'custom') routine.customDays = Math.max(1, Math.round(Number(customDays)) || 7)
+    setData((p) => ({ ...p, routines: [...p.routines, routine] }))
     showToast('✅ Rotina criada!')
   }
 
@@ -198,10 +205,41 @@ export function useHousehold(session, showToast) {
     }
   }
 
-  const updateFreq = (id, newFreq) =>
-    setData((p) => ({ ...p, routines: p.routines.map((r) => (r.id === id ? { ...r, freq: newFreq } : r)) }))
+  const updateFreq = (id, newFreq, customDays) =>
+    setData((p) => ({
+      ...p,
+      routines: p.routines.map((r) =>
+        r.id === id
+          ? { ...r, freq: newFreq, customDays: newFreq === 'custom' ? Math.max(1, Math.round(Number(customDays)) || 7) : undefined }
+          : r
+      ),
+    }))
   const removeRoutine = (id) =>
     setData((p) => ({ ...p, routines: p.routines.filter((r) => r.id !== id) }))
+
+  // Desfaz a conclusão de hoje: remove o check-in de hoje, devolve o XP e volta o status.
+  const undoComplete = (id) => {
+    const today = todayStr()
+    const routine = data.routines.find((r) => r.id === id)
+    if (!routine || routine.lastDone !== today) return
+    setData((p) => {
+      let removed = null
+      const newLog = []
+      for (let i = p.log.length - 1; i >= 0; i--) {
+        const l = p.log[i]
+        if (!removed && l.title === routine.title && l.date === today) { removed = l; continue }
+        newLog.unshift(l)
+      }
+      const dates = newLog.filter((l) => l.title === routine.title).map((l) => l.date).sort()
+      const newLastDone = dates.length ? dates[dates.length - 1] : null
+      const members = removed
+        ? p.members.map((m) => (m.id === removed.memberId ? { ...m, xp: Math.max(0, m.xp - (removed.xp || 0)) } : m))
+        : p.members
+      const routines = p.routines.map((r) => (r.id === id ? { ...r, lastDone: newLastDone } : r))
+      return { ...p, members, routines, log: newLog }
+    })
+    showToast('↩️ Marcação desfeita')
+  }
 
   const me = data && session ? data.members.find((m) => m.userId === session.user.id) : undefined
 
@@ -220,5 +258,6 @@ export function useHousehold(session, showToast) {
     completeTask,
     updateFreq,
     removeRoutine,
+    undoComplete,
   }
 }

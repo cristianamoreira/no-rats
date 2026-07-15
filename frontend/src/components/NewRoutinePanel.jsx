@@ -1,24 +1,34 @@
 import { useState } from 'react'
 import { FREQUENCIES, SUGGESTIONS } from '../lib/constants'
 
-export default function NewRoutinePanel({ members, onAdd }) {
+const PILL_ACTIVE = { background: '#F4A72B', borderColor: '#221F2B', color: '#221F2B', boxShadow: '2px 2px 0 #221F2B' }
+
+export default function NewRoutinePanel({ members, routines = [], onAdd }) {
   const [rTitle, setRTitle] = useState('')
   const [rFreq, setRFreq] = useState('semanal')
   const [rXp, setRXp] = useState(15)
   const [rOwner, setROwner] = useState('') // '' = Livre
+  const [rCustomDays, setRCustomDays] = useState(10)
 
   const setFreqForm = (key) => {
     setRFreq(key)
-    setRXp(FREQUENCIES[key].xp)
+    if (FREQUENCIES[key]) setRXp(FREQUENCIES[key].xp)
   }
   const useSuggestion = (sug) => {
     setRTitle(sug.title)
     setFreqForm(sug.freq)
   }
   const submit = () => {
-    onAdd({ title: rTitle, freq: rFreq, xp: rXp, ownerId: rOwner || null })
-    if (rTitle.trim()) setRTitle('')
+    const t = rTitle.trim()
+    if (!t) return onAdd({ title: '', freq: rFreq, xp: rXp, ownerId: rOwner || null }) // hook mostra o aviso de nome
+    const dup = routines.some((r) => (r.title || '').trim().toLowerCase() === t.toLowerCase())
+    if (dup && !window.confirm(`Já existe uma rotina chamada "${t}". Quer adicionar mesmo assim?`)) return
+    onAdd({ title: t, freq: rFreq, xp: rXp, ownerId: rOwner || null, customDays: rCustomDays })
+    setRTitle('')
   }
+
+  const usedTitles = new Set(routines.map((r) => (r.title || '').trim().toLowerCase()))
+  const freshSuggestions = SUGGESTIONS.filter((s) => !usedTitles.has(s.title.trim().toLowerCase())).slice(0, 6)
 
   return (
     <section className="nr-panel">
@@ -32,9 +42,17 @@ export default function NewRoutinePanel({ members, onAdd }) {
           <div className="nr-field-label">Frequência</div>
           <div className="nr-pills">
             {Object.entries(FREQUENCIES).map(([key, f]) => (
-              <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? { background: '#F4A72B', borderColor: '#221F2B', color: '#221F2B', boxShadow: '2px 2px 0 #221F2B' } : undefined}>{f.label}</button>
+              <button key={key} className="nr-pill" onClick={() => setFreqForm(key)} style={rFreq === key ? PILL_ACTIVE : undefined}>{f.label}</button>
             ))}
+            <button className="nr-pill" onClick={() => setFreqForm('custom')} style={rFreq === 'custom' ? PILL_ACTIVE : undefined}>Personalizada</button>
           </div>
+          {rFreq === 'custom' && (
+            <div className="nr-freq-row" style={{ marginTop: '10px' }}>
+              <span className="nr-freq-lbl">A cada</span>
+              <input className="nr-num" style={{ width: '76px' }} type="number" min="1" value={rCustomDays} onChange={(e) => setRCustomDays(e.target.value)} />
+              <span className="nr-freq-lbl">dias</span>
+            </div>
+          )}
         </div>
         <div>
           <div className="nr-field-label">Vale quantos XP?</div>
@@ -48,10 +66,14 @@ export default function NewRoutinePanel({ members, onAdd }) {
           </select>
         </div>
       </div>
-      <div className="nr-field-label" style={{ marginTop: '16px' }}>💡 Sugestões — toque para preencher</div>
-      <div className="nr-suggests">
-        {SUGGESTIONS.map((s) => <button key={s.title} className="nr-suggest" onClick={() => useSuggestion(s)}>+ {s.title}</button>)}
-      </div>
+      {freshSuggestions.length > 0 && (
+        <>
+          <div className="nr-field-label" style={{ marginTop: '16px' }}>💡 Sugestões — toque para preencher</div>
+          <div className="nr-suggests">
+            {freshSuggestions.map((s) => <button key={s.title} className="nr-suggest" onClick={() => useSuggestion(s)}>+ {s.title}</button>)}
+          </div>
+        </>
+      )}
     </section>
   )
 }

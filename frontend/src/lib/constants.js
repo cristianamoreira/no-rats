@@ -6,15 +6,37 @@ export const FREQUENCIES = {
 }
 
 export const COLORS = ['#ED5C97', '#3F8FE0', '#F4A72B', '#2FA46B', '#8C93A1', '#B36BD4']
-export const EMOJIS = ['👩', '👨', '🧒', '👧', '👦', '🧑', '👵', '👴', '🐱', '🐶']
+
+export const EMOJIS = [
+  '👩', '👩🏻', '👩🏽', '👩🏾', '👩🏿',
+  '👱‍♀️', '👩‍🦰', '👩‍🦱', '👩‍🦳',
+  '👨', '👨🏻', '👨🏽', '👨🏾', '👨🏿',
+  '👱‍♂️', '👨‍🦰', '👨‍🦱', '👨‍🦲',
+  '🧑', '🧑🏽', '🧑🏾',
+  '🧒', '👧', '👦', '👵', '👴', '🧕', '👳',
+  '🐱', '🐶', '🐰', '🦊', '🐻', '🐼',
+]
+
 export const WD_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 export const MEDALS = ['🥇', '🥈', '🥉']
 
 export const SUGGESTIONS = [
   { title: 'Tirar o lixo', freq: 'diaria' },
+  { title: 'Lavar a louça', freq: 'diaria' },
+  { title: 'Arrumar a cama', freq: 'diaria' },
   { title: 'Regar as plantas', freq: 'semanal' },
   { title: 'Passar pano no chão', freq: 'semanal' },
   { title: 'Aspirar a casa', freq: 'semanal' },
   { title: 'Trocar as toalhas', freq: 'semanal' },
+  { title: 'Limpar o banheiro', freq: 'semanal' },
+  { title: 'Estender a roupa', freq: 'semanal' },
+  { title: 'Dobrar a roupa', freq: 'semanal' },
+  { title: 'Limpar o fogão', freq: 'semanal' },
+  { title: 'Tirar o pó dos móveis', freq: 'semanal' },
+  { title: 'Trocar a roupa de cama', freq: 'quinzenal' },
+  { title: 'Limpar o micro-ondas', freq: 'quinzenal' },
+  { title: 'Limpar os vidros', freq: 'mensal' },
   { title: 'Limpar a geladeira', freq: 'mensal' },
+  { title: 'Faxina geral', freq: 'mensal' },
+  { title: 'Limpar o ventilador', freq: 'mensal' },
 ]

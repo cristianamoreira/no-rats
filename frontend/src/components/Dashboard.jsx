@@ -62,7 +62,7 @@ export default function Dashboard({ hh, showToast }) {
         )}
 
         {isLeader && (
-          <NewRoutinePanel members={members} onAdd={hh.addRoutine} />
+          <NewRoutinePanel members={members} routines={routines} onAdd={hh.addRoutine} />
         )}
 
         <div className="nr-toggle">
@@ -78,7 +78,7 @@ export default function Dashboard({ hh, showToast }) {
             me={me}
             isLeader={isLeader}
             onOpenCheckin={setModalRoutine}
-            onComplete={hh.completeTask}
+            onUndo={hh.undoComplete}
             onUpdateFreq={hh.updateFreq}
             onRemoveRoutine={hh.removeRoutine}
           />
