@@ -6,6 +6,7 @@ import AuthScreen from './components/AuthScreen'
 import HouseholdSetup from './components/HouseholdSetup'
 import Dashboard from './components/Dashboard'
 import Toast from './components/Toast'
+import InstallBanner from './components/InstallBanner'
 
 function readInviteCode() {
   try {
@@ -59,6 +60,7 @@ export default function App() {
     <>
       {screen}
       <Toast toast={toast} />
+      <InstallBanner />
     </>
   )
 }
