@@ -10,15 +10,20 @@ export default function AuthScreen() {
   const [pw, setPw] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+  const [pending, setPending] = useState(false) // conta aguardando confirmação por e-mail
 
   const submit = async () => {
     if (mode === 'signup' && !name.trim()) return setMsg('Digite seu nome.')
     if (!email.trim() || !pw) return setMsg('Preencha email e senha.')
     setBusy(true)
     setMsg('')
+    setPending(false)
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw })
-      if (error) setMsg(traduz(error.message))
+      if (error) {
+        setMsg(traduz(error.message))
+        if (/Email not confirmed/i.test(error.message)) setPending(true)
+      }
     } else {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -29,14 +34,31 @@ export default function AuthScreen() {
         },
       })
       if (error) setMsg(traduz(error.message))
-      else if (!data.session) setMsg('📧 Enviamos um e-mail de confirmação para a sua caixa de entrada. Confira também o spam e clique no link para ativar sua conta.')
+      else if (!data.session) {
+        setMsg('📧 Enviamos um e-mail de confirmação para a sua caixa de entrada. Confira também o spam e clique no link para ativar sua conta.')
+        setPending(true)
+      }
     }
+    setBusy(false)
+  }
+
+  const resend = async () => {
+    if (!email.trim()) return setMsg('Digite o email da conta para reenviar.')
+    setBusy(true)
+    setMsg('')
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: window.location.origin },
+    })
+    setMsg(error ? traduz(error.message) : '📧 E-mail de confirmação reenviado! Confira a caixa de entrada e o spam.')
     setBusy(false)
   }
 
   const toggleMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login')
     setMsg('')
+    setPending(false)
   }
 
   return (
@@ -65,6 +87,11 @@ export default function AuthScreen() {
           <button className="nr-btn nr-btn-primary" style={{ width: '100%', marginTop: '6px' }} onClick={submit} disabled={busy}>
             {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar no jogo' : 'Criar minha conta'}
           </button>
+          {pending && (
+            <button className="nr-linkbtn" onClick={resend} disabled={busy} style={{ display: 'block' }}>
+              Reenviar e-mail de confirmação
+            </button>
+          )}
           <button className="nr-linkbtn" onClick={toggleMode}>
             {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
           </button>
