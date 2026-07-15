@@ -63,7 +63,7 @@ export default function TodayTab({ routines, members, me, isLeader, onOpenChecki
                   ) : free || mine ? (
                     <button className="nr-btn nr-complete" onClick={() => onOpenCheckin(r)}>📸 Fiz hoje</button>
                   ) : (
-                    <button className="nr-btn nr-steal" onClick={() => onOpenCheckin(r)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Fiz eu</button>
+                    <button className="nr-btn nr-steal" onClick={() => onOpenCheckin(r)} title={`Roubar de ${owner ? owner.name : ''}`}>🥷 Feito por mim</button>
                   )}
                   {isLeader && <button className="nr-btn nr-del nr-btn-sm" title="Excluir" onClick={() => onRemoveRoutine(r.id)}>🗑️</button>}
                 </div>
