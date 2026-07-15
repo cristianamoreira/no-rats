@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">No Rats</string>
+    <string name="title_activity_main">No Rats</string>
+    <string name="package_name">br.com.noratsapp</string>
+    <string name="custom_url_scheme">br.com.noratsapp</string>
+</resources>
