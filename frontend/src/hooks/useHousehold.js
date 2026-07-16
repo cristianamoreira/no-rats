@@ -13,6 +13,10 @@ export function useHousehold(session, showToast) {
   const skipSave = useRef(false)
   const saveTimer = useRef(null)
   const writeIdRef = useRef(null)
+  const dataRef = useRef(null)
+
+  // Mantém uma referência sempre atualizada do estado (usada no realtime, sem closure obsoleta).
+  useEffect(() => { dataRef.current = data }, [data])
 
   // Load the household whenever the session changes.
   useEffect(() => {
@@ -92,8 +96,23 @@ export function useHousehold(session, showToast) {
         const nd = payload.new && payload.new.data
         if (!nd) return
         if (nd._w && nd._w === writeIdRef.current) return
+        const normalized = normalizeData(nd)
+        // Avisa quando OUTRO integrante conclui uma tarefa (novos check-ins no log).
+        const prev = dataRef.current
+        if (prev && Array.isArray(prev.log)) {
+          const prevIds = new Set(prev.log.map((l) => l.id))
+          const myId = session && (normalized.members.find((m) => m.userId === session.user.id) || {}).id
+          const novos = normalized.log.filter((l) => !prevIds.has(l.id) && l.memberId !== myId)
+          if (novos.length === 1) {
+            const l = novos[0]
+            const quem = normalized.members.find((m) => m.id === l.memberId)
+            showToast(`${quem ? quem.emoji + ' ' + quem.name : 'Alguém'} concluiu "${l.title}" · +${l.xp} XP`)
+          } else if (novos.length > 1) {
+            showToast(`✅ ${novos.length} tarefas concluídas pela família`)
+          }
+        }
         skipSave.current = true
-        setData(normalizeData(nd))
+        setData(normalized)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
