@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { WD_SHORT } from '../lib/constants'
-import { todayStr, addDays, weekStartOf, ddmm } from '../lib/dates'
+import { todayStr, addDays, weekStartOf, ddmm, hm } from '../lib/dates'
 
 export default function CalendarTab({ members, log, onLightbox }) {
   const [weekOffset, setWeekOffset] = useState(0)
@@ -50,7 +50,7 @@ export default function CalendarTab({ members, log, onLightbox }) {
         <div className="nr-tasks">
           {selCheckins.map((l) => {
             const m = memberById(l.memberId)
-            const hasPhoto = l.before || l.after
+            const pics = l.photos || [l.before, l.after].filter(Boolean)
             return (
               <div className="nr-checkin" key={l.id}>
                 <div className="nr-checkin-top">
@@ -58,22 +58,18 @@ export default function CalendarTab({ members, log, onLightbox }) {
                     {m && <span className="nr-owner-tag" style={{ background: m.color, marginRight: '8px' }}>{m.emoji} {m.name}</span>}
                     <strong>{l.title}</strong>
                   </span>
-                  <span className="nr-xp-pill">+{l.xp} XP</span>
+                  <span className="nr-checkin-right">
+                    {l.at && <span className="nr-checkin-time">🕒 {hm(l.at)}</span>}
+                    <span className="nr-xp-pill">+{l.xp} XP</span>
+                  </span>
                 </div>
-                {hasPhoto && (
+                {pics.length > 0 && (
                   <div className="nr-checkin-photos">
-                    {l.before && (
-                      <figure className="nr-ba">
-                        <img src={l.before} className="nr-ba-img" onClick={() => onLightbox(l.before)} alt="antes" />
-                        <figcaption>Antes</figcaption>
+                    {pics.map((src, i) => (
+                      <figure className="nr-ba" key={i}>
+                        <img src={src} className="nr-ba-img" onClick={() => onLightbox(src)} alt={'foto ' + (i + 1)} />
                       </figure>
-                    )}
-                    {l.after && (
-                      <figure className="nr-ba">
-                        <img src={l.after} className="nr-ba-img" onClick={() => onLightbox(l.after)} alt="depois" />
-                        <figcaption>Depois</figcaption>
-                      </figure>
-                    )}
+                    ))}
                   </div>
                 )}
               </div>

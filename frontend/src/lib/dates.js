@@ -18,3 +18,12 @@ export function weekStartOf(dateStr) {
 export function ddmm(dateStr) {
   return `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`
 }
+// Horário HH:MM a partir de um timestamp ISO.
+export function hm(iso) {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  } catch (e) {
+    return ''
+  }
+}

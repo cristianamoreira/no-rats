@@ -11,7 +11,7 @@ import Lightbox from './Lightbox'
 import NotifyToggle from './NotifyToggle'
 
 export default function Dashboard({ hh, showToast }) {
-  const { data, houseCode, me } = hh
+  const { data, houseCode, houseName, me } = hh
   const [tab, setTab] = useState('hoje')
   const [modalRoutine, setModalRoutine] = useState(null)
   const [lightbox, setLightbox] = useState(null)
@@ -95,7 +95,7 @@ export default function Dashboard({ hh, showToast }) {
 
         <NotifyToggle householdId={hh.householdId} userId={me && me.userId} showToast={showToast} />
 
-        <footer className="nr-footer">No Rats · dados salvos na nuvem 🔐 · casa {houseCode}</footer>
+        <footer className="nr-footer">No Rats · dados salvos na nuvem 🔐 · {houseName || 'casa ' + houseCode}</footer>
       </main>
     </div>
   )

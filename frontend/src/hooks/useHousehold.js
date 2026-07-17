@@ -10,6 +10,7 @@ export function useHousehold(session, showToast) {
   const [loading, setLoading] = useState(true)
   const [householdId, setHouseholdId] = useState(null)
   const [houseCode, setHouseCode] = useState('')
+  const [houseName, setHouseName] = useState('')
   const [data, setData] = useState(null)
   const skipSave = useRef(false)
   const saveTimer = useRef(null)
@@ -36,10 +37,11 @@ export function useHousehold(session, showToast) {
         setLoading(false)
         return
       }
-      const { data: hh } = await supabase.from('households').select('id,code,data').eq('id', mem.household_id).maybeSingle()
+      const { data: hh } = await supabase.from('households').select('id,name,code,data').eq('id', mem.household_id).maybeSingle()
       if (hh) {
         setHouseholdId(hh.id)
         setHouseCode(hh.code || '')
+        setHouseName(hh.name || '')
         skipSave.current = true
         setData(normalizeData(hh.data))
       }
@@ -122,6 +124,7 @@ export function useHousehold(session, showToast) {
   const logout = async () => {
     await supabase.auth.signOut()
     setHouseCode('')
+    setHouseName('')
   }
 
   const createHousehold = async (casaName, myName, myEmoji) => {
@@ -140,6 +143,7 @@ export function useHousehold(session, showToast) {
     if (error) throw new Error('Erro ao criar casa: ' + error.message)
     setHouseholdId(hid)
     setHouseCode(code)
+    setHouseName(casaName)
     skipSave.current = true
     setData(initData)
     setLoading(false)
@@ -149,8 +153,9 @@ export function useHousehold(session, showToast) {
   const joinHousehold = async (code, myName, myEmoji) => {
     const { data: hid, error } = await supabase.rpc('join_household', { invite_code: code })
     if (error) throw new Error('Código inválido ou erro ao entrar.')
-    const { data: hh, error: e2 } = await supabase.from('households').select('id,code,data').eq('id', hid).single()
+    const { data: hh, error: e2 } = await supabase.from('households').select('id,name,code,data').eq('id', hid).single()
     if (e2) throw new Error('Erro ao carregar a casa.')
+    setHouseName(hh.name || '')
     const d = normalizeData(hh.data)
     let myId = (d.members.find((m) => m.userId === session.user.id) || {}).id
     if (!myId) {
@@ -206,18 +211,16 @@ export function useHousehold(session, showToast) {
     const me = data.members.find((m) => m.userId === session.user.id)
     if (!me) return
     const owner = routine.ownerId ? data.members.find((m) => m.id === routine.ownerId) : null
-    const entry = { id: 'l' + Date.now(), memberId: me.id, title: routine.title, xp: routine.xp, date: today }
-    if (photos) {
-      if (photos.before) entry.before = photos.before
-      if (photos.after) entry.after = photos.after
-    }
+    const pics = photos && Array.isArray(photos.photos) ? photos.photos : []
+    const entry = { id: 'l' + Date.now(), memberId: me.id, title: routine.title, xp: routine.xp, date: today, at: new Date().toISOString() }
+    if (pics.length) entry.photos = pics
     setData((p) => ({
       ...p,
       members: p.members.map((m) => (m.id === me.id ? { ...m, xp: m.xp + routine.xp } : m)),
       routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
       log: [...p.log, entry],
     }))
-    const photoTag = photos && (photos.before || photos.after) ? ' 📸' : ''
+    const photoTag = pics.length ? ' 📸' : ''
     if (owner && owner.id !== me.id) {
       showToast(`🥷 ${me.name} roubou a tarefa de ${owner.name}! +${routine.xp} XP${photoTag}`)
     } else {
@@ -269,6 +272,7 @@ export function useHousehold(session, showToast) {
     loading,
     householdId,
     houseCode,
+    houseName,
     data,
     me,
     createHousehold,

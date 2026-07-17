@@ -161,10 +161,11 @@ body { margin: 0; }
 .nr-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; border: 1px solid rgba(34,31,43,0.25); }
 .nr-checkin { background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 14px 16px; box-shadow: var(--pop-sm); }
 .nr-checkin-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); }
-.nr-checkin-photos { display: flex; gap: 12px; margin-top: 12px; }
-.nr-ba { margin: 0; flex: 1; text-align: center; }
-.nr-ba-img { width: 100%; height: 130px; object-fit: cover; border-radius: 12px; cursor: pointer; border: 2px solid var(--ink); }
-.nr-ba figcaption { font-size: 12px; font-weight: 700; color: var(--ink-2); margin-top: 6px; }
+.nr-checkin-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.nr-checkin-time { font-size: 12px; font-weight: 600; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nr-checkin-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.nr-ba { margin: 0; }
+.nr-ba-img { width: 92px; height: 92px; object-fit: cover; border-radius: 10px; cursor: pointer; border: 2px solid var(--ink); display: block; }
 .nr-week-empty { font-size: 13px; color: var(--ink-3); }
 
 /* ---------- Ranking ---------- */
@@ -186,6 +187,12 @@ body { margin: 0; }
 .nr-photo-slot:hover { border-color: var(--cheese); }
 .nr-photo-ph { text-align: center; font-size: 22px; color: var(--ink-3); font-weight: 700; line-height: 1.5; }
 .nr-photo-img { width: 100%; height: 100%; object-fit: cover; }
+.nr-photo-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.nr-photo-thumb { position: relative; width: 84px; height: 84px; border-radius: 12px; overflow: hidden; border: 2px solid var(--ink); }
+.nr-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nr-photo-del { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(34,31,43,0.75); color: #fff; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.nr-photo-add { width: 84px; height: 84px; border: 2px dashed var(--line); border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--paper); text-align: center; font-size: 15px; font-weight: 700; color: var(--ink-3); line-height: 1.3; transition: border-color 0.15s ease; }
+.nr-photo-add:hover { border-color: var(--cheese); }
 .nr-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 .nr-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1300; cursor: zoom-out; animation: nrfade 0.15s ease; }
 .nr-lightbox img { max-width: 100%; max-height: 100%; border-radius: 12px; }
