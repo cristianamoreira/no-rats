@@ -72,6 +72,30 @@ drop policy if exists "own membership insert" on public.memberships;
 
 
 -- ============================================================================
+-- BLOCO C — Storage das fotos de check-in (aplicar 1x no SQL Editor)
+-- ============================================================================
+-- As fotos deixam de ser base64 dentro de households.data (que inchava a
+-- memória no celular e o payload de cada save) e passam a viver no Storage;
+-- households.data guarda só a URL. Cria o bucket público "checkins" e restringe
+-- o UPLOAD a membros da casa, que só gravam na pasta da própria casa (primeiro
+-- segmento do caminho = household_id). Leitura é pública (URLs não-adivinháveis).
+
+insert into storage.buckets (id, name, public)
+values ('checkins', 'checkins', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "checkin upload by household members" on storage.objects;
+create policy "checkin upload by household members"
+on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'checkins'
+  and (storage.foldername(name))[1] in (
+    select m.household_id::text from public.memberships m where m.user_id = auth.uid()
+  )
+);
+
+
+-- ============================================================================
 -- Estado final esperado das policies
 -- ============================================================================
 --  households:

@@ -27,6 +27,8 @@ export default function Dashboard({ hh, showToast }) {
       {modalRoutine && (
         <CheckinModal
           routine={modalRoutine}
+          householdId={hh.householdId}
+          showToast={showToast}
           onConfirm={(photos) => {
             hh.completeTask(modalRoutine.id, photos)
             setModalRoutine(null)
@@ -77,6 +79,7 @@ export default function Dashboard({ hh, showToast }) {
             routines={routines}
             members={members}
             me={me}
+            log={log}
             isLeader={isLeader}
             onOpenCheckin={setModalRoutine}
             onUndo={hh.undoComplete}

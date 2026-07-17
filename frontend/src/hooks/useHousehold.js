@@ -217,7 +217,7 @@ export function useHousehold(session, showToast) {
     setData((p) => ({
       ...p,
       members: p.members.map((m) => (m.id === me.id ? { ...m, xp: m.xp + routine.xp } : m)),
-      routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, penalized: false } : r)),
+      routines: p.routines.map((r) => (r.id === id ? { ...r, lastDone: today, lastDoneBy: me.id, penalized: false } : r)),
       log: [...p.log, entry],
     }))
     const photoTag = pics.length ? ' 📸' : ''
@@ -247,6 +247,15 @@ export function useHousehold(session, showToast) {
     const today = todayStr()
     const routine = data.routines.find((r) => r.id === id)
     if (!routine || routine.lastDone !== today) return
+    // Só quem concluiu o check-in de hoje (ou o líder) pode desfazer.
+    const me = data.members.find((m) => m.userId === session.user.id)
+    const isLeader = me && data.leaderId === me.id
+    const todayEntry = [...data.log].reverse().find((l) => l.title === routine.title && l.date === today)
+    const doerId = routine.lastDoneBy || (todayEntry && todayEntry.memberId)
+    if (doerId && me && doerId !== me.id && !isLeader) {
+      const doer = data.members.find((m) => m.id === doerId)
+      return showToast(`🚫 Só ${doer ? doer.name : 'quem concluiu'} ou o líder pode desfazer`)
+    }
     setData((p) => {
       let removed = null
       const newLog = []
@@ -255,12 +264,14 @@ export function useHousehold(session, showToast) {
         if (!removed && l.title === routine.title && l.date === today) { removed = l; continue }
         newLog.unshift(l)
       }
-      const dates = newLog.filter((l) => l.title === routine.title).map((l) => l.date).sort()
-      const newLastDone = dates.length ? dates[dates.length - 1] : null
+      const remaining = newLog.filter((l) => l.title === routine.title)
+      const lastEntry = remaining.length ? remaining[remaining.length - 1] : null
+      const newLastDone = lastEntry ? lastEntry.date : null
+      const newLastDoneBy = lastEntry ? lastEntry.memberId : null
       const members = removed
         ? p.members.map((m) => (m.id === removed.memberId ? { ...m, xp: Math.max(0, m.xp - (removed.xp || 0)) } : m))
         : p.members
-      const routines = p.routines.map((r) => (r.id === id ? { ...r, lastDone: newLastDone } : r))
+      const routines = p.routines.map((r) => (r.id === id ? { ...r, lastDone: newLastDone, lastDoneBy: newLastDoneBy } : r))
       return { ...p, members, routines, log: newLog }
     })
     showToast('↩️ Marcação desfeita')

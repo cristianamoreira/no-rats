@@ -2,8 +2,14 @@ import { FREQUENCIES } from '../lib/constants'
 import { todayStr } from '../lib/dates'
 import { getStatus, freqLabel } from '../lib/routines'
 
-export default function TodayTab({ routines, members, me, isLeader, onOpenCheckin, onUndo, onUpdateFreq, onRemoveRoutine }) {
+export default function TodayTab({ routines, members, me, log = [], isLeader, onOpenCheckin, onUndo, onUpdateFreq, onRemoveRoutine }) {
   const memberById = (id) => members.find((m) => m.id === id)
+  // Quem concluiu o check-in de hoje desta rotina (usa lastDoneBy; cai no log para dados antigos).
+  const todayDoerId = (r) => {
+    if (r.lastDoneBy) return r.lastDoneBy
+    const e = [...log].reverse().find((l) => l.title === r.title && l.date === todayStr())
+    return e ? e.memberId : null
+  }
   const withStatus = routines.map((r) => ({ ...r, status: getStatus(r) }))
   withStatus.sort((a, b) => b.status.sort - a.status.sort)
 
@@ -58,7 +64,9 @@ export default function TodayTab({ routines, members, me, isLeader, onOpenChecki
                   {doneToday ? (
                     <>
                       <button className="nr-btn nr-done-today">✓ Feita hoje</button>
-                      <button className="nr-btn nr-del nr-btn-sm" title="Desfazer marcação" onClick={() => onUndo(r.id)}>↩️ Desfazer</button>
+                      {(isLeader || (me && todayDoerId(r) === me.id)) && (
+                        <button className="nr-btn nr-del nr-btn-sm" title="Desfazer marcação" onClick={() => onUndo(r.id)}>↩️ Desfazer</button>
+                      )}
                     </>
                   ) : free || mine ? (
                     <button className="nr-btn nr-complete" onClick={() => onOpenCheckin(r)}>📸 Feito por mim</button>
