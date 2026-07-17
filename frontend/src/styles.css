@@ -131,8 +131,14 @@ body { margin: 0; }
 
 /* ---------- Tasks ---------- */
 .nr-list-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink); margin: 0 0 14px; letter-spacing: -0.01em; }
-.nr-tasks { display: grid; gap: 12px; }
-.nr-task { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--card); border: 2px solid var(--ink); border-left-width: 6px; border-left-color: var(--green); border-radius: 14px; padding: 14px 16px; box-shadow: var(--pop-sm); transition: transform 0.14s ease, box-shadow 0.14s ease; }
+.nr-tasks { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.nr-task { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-width: 0; background: var(--card); border: 2px solid var(--ink); border-left-width: 6px; border-left-color: var(--green); border-radius: 14px; padding: 14px 16px; box-shadow: var(--pop-sm); transition: transform 0.14s ease, box-shadow 0.14s ease; }
+/* No celular, as ações descem para baixo do texto para o card nunca estourar a tela. */
+@media (max-width: 600px) {
+  .nr-task { flex-wrap: wrap; }
+  .nr-task > div:first-child { flex: 1 1 100%; min-width: 0; }
+  .nr-actions { width: 100%; }
+}
 .nr-task:hover { transform: translate(-1px,-1px); box-shadow: var(--pop); }
 .nr-task-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .nr-task-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
