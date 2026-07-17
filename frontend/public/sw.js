@@ -2,7 +2,33 @@
 // Estratégia: HTML sempre da rede (offline cai no cache); assets em cache-first
 // com atualização em segundo plano. Só intercepta o próprio domínio (Supabase e
 // outras APIs passam direto).
-const CACHE = 'norats-v3'
+const CACHE = 'norats-v4'
+
+// Push: mostra a notificação quando chega do servidor.
+self.addEventListener('push', (e) => {
+  let data = {}
+  try { data = e.data ? e.data.json() : {} } catch (_) { data = { body: e.data ? e.data.text() : '' } }
+  const title = data.title || 'No Rats'
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: { url: data.url || '/' },
+  }
+  e.waitUntil(self.registration.showNotification(title, options))
+})
+
+// Clique na notificação: foca a aba aberta ou abre o app.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = (e.notification.data && e.notification.data.url) || '/'
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus() }
+      if (self.clients.openWindow) return self.clients.openWindow(url)
+    })
+  )
+})
 
 self.addEventListener('install', () => self.skipWaiting())
 

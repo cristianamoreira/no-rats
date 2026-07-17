@@ -4,6 +4,7 @@ import { COLORS, FREQUENCIES } from '../lib/constants'
 import { normalizeData, newCode } from '../lib/household'
 import { seedRoutines, getStatus } from '../lib/routines'
 import { todayStr } from '../lib/dates'
+import { notifyTaskDone } from '../lib/push'
 
 export function useHousehold(session, showToast) {
   const [loading, setLoading] = useState(true)
@@ -222,6 +223,8 @@ export function useHousehold(session, showToast) {
     } else {
       showToast(`✅ +${routine.xp} XP para ${me.name}${photoTag}`)
     }
+    // notifica os outros integrantes (push, se ativado)
+    notifyTaskDone({ householdId, title: routine.title, actorName: me.name, actorEmoji: me.emoji, xp: routine.xp })
   }
 
   const updateFreq = (id, newFreq, customDays) =>

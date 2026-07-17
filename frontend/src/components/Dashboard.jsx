@@ -8,6 +8,7 @@ import CalendarTab from './CalendarTab'
 import RankingTab from './RankingTab'
 import CheckinModal from './CheckinModal'
 import Lightbox from './Lightbox'
+import NotifyToggle from './NotifyToggle'
 
 export default function Dashboard({ hh, showToast }) {
   const { data, houseCode, me } = hh
@@ -91,6 +92,8 @@ export default function Dashboard({ hh, showToast }) {
         {tab === 'ranking' && (
           <RankingTab members={members} log={log} />
         )}
+
+        <NotifyToggle householdId={hh.householdId} userId={me && me.userId} showToast={showToast} />
 
         <footer className="nr-footer">No Rats · dados salvos na nuvem 🔐 · casa {houseCode}</footer>
       </main>

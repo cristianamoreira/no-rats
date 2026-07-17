@@ -27,3 +27,6 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Supabase CLI
+frontend/supabase/.temp/
