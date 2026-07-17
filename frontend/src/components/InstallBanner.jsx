@@ -3,6 +3,10 @@ import { useState, useEffect } from 'react'
 function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 }
+function isNativeApp() {
+  // Dentro do app Capacitor (App Store / Play) não faz sentido oferecer "Instalar"
+  return !!(window.Capacitor && (typeof window.Capacitor.isNativePlatform === 'function' ? window.Capacitor.isNativePlatform() : window.Capacitor.isNative))
+}
 function isIOS() {
   return /iphone|ipad|ipod/i.test(window.navigator.userAgent) && !window.MSStream
 }
@@ -13,7 +17,7 @@ export default function InstallBanner() {
   const [iosHint, setIosHint] = useState(false)
 
   useEffect(() => {
-    if (isStandalone()) return
+    if (isNativeApp() || isStandalone()) return
     try { if (localStorage.getItem('nr_install_dismissed') === '1') return } catch (e) {}
     const onPrompt = (e) => {
       e.preventDefault()
