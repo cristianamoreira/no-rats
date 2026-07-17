@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FREQUENCIES, SUGGESTIONS } from '../lib/constants'
 
 const PILL_ACTIVE = { background: '#F4A72B', borderColor: '#221F2B', color: '#221F2B', boxShadow: '2px 2px 0 #221F2B' }
+const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 
 export default function NewRoutinePanel({ members, routines = [], onAdd }) {
   const [rTitle, setRTitle] = useState('')
@@ -9,6 +10,7 @@ export default function NewRoutinePanel({ members, routines = [], onAdd }) {
   const [rXp, setRXp] = useState(15)
   const [rOwner, setROwner] = useState('') // '' = Livre
   const [rCustomDays, setRCustomDays] = useState(10)
+  const [showSug, setShowSug] = useState(false)
 
   const setFreqForm = (key) => {
     setRFreq(key)
@@ -17,6 +19,7 @@ export default function NewRoutinePanel({ members, routines = [], onAdd }) {
   const useSuggestion = (sug) => {
     setRTitle(sug.title)
     setFreqForm(sug.freq)
+    setShowSug(false)
   }
   const submit = () => {
     const t = rTitle.trim()
@@ -25,16 +28,50 @@ export default function NewRoutinePanel({ members, routines = [], onAdd }) {
     if (dup && !window.confirm(`Já existe uma rotina chamada "${t}". Quer adicionar mesmo assim?`)) return
     onAdd({ title: t, freq: rFreq, xp: rXp, ownerId: rOwner || null, customDays: rCustomDays })
     setRTitle('')
+    setShowSug(false)
   }
 
   const usedTitles = new Set(routines.map((r) => (r.title || '').trim().toLowerCase()))
+  const q = norm(rTitle)
+  const matches = q.length >= 2
+    ? SUGGESTIONS.filter((s) => {
+        const t = norm(s.title)
+        return t.includes(q) && t !== q && !usedTitles.has(s.title.trim().toLowerCase())
+      }).slice(0, 6)
+    : []
   const freshSuggestions = SUGGESTIONS.filter((s) => !usedTitles.has(s.title.trim().toLowerCase())).slice(0, 6)
 
   return (
     <section className="nr-panel">
       <h2 className="nr-h">Nova rotina</h2>
       <div className="nr-row">
-        <input className="nr-input" type="text" placeholder="Ex: Lavar as toalhas, tirar o lixo…" value={rTitle} onChange={(e) => setRTitle(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && submit()} />
+        <div className="nr-typeahead">
+          <input
+            className="nr-input"
+            type="text"
+            placeholder="Ex: lavar, limpar, varrer…"
+            value={rTitle}
+            onChange={(e) => { setRTitle(e.target.value); setShowSug(true) }}
+            onFocus={() => setShowSug(true)}
+            onBlur={() => setShowSug(false)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setShowSug(false) }}
+          />
+          {showSug && matches.length > 0 && (
+            <div className="nr-typeahead-list">
+              {matches.map((s) => (
+                <button
+                  key={s.title}
+                  type="button"
+                  className="nr-typeahead-item"
+                  onMouseDown={(e) => { e.preventDefault(); useSuggestion(s) }}
+                >
+                  <span>{s.title}</span>
+                  <span className="nr-typeahead-freq">{FREQUENCIES[s.freq] ? FREQUENCIES[s.freq].label : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button className="nr-btn nr-btn-primary" onClick={submit}>Adicionar</button>
       </div>
       <div className="nr-form-grid">

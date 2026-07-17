@@ -110,6 +110,15 @@ body { margin: 0; }
 .nr-suggests { display: flex; gap: 8px; flex-wrap: wrap; }
 .nr-suggest { padding: 6px 12px; border-radius: 999px; border: 2px dashed var(--line); background: #fff; color: var(--ink-2); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
 .nr-suggest:hover { border-color: var(--cheese); color: #8A5510; background: var(--cheese-tint); }
+
+/* ---------- Autocomplete de tarefa ---------- */
+.nr-typeahead { position: relative; flex: 1; min-width: 160px; }
+.nr-typeahead .nr-input { width: 100%; min-width: 0; }
+.nr-typeahead-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; background: var(--card); border: 2px solid var(--ink); border-radius: 12px; box-shadow: var(--pop); overflow: hidden auto; max-height: 264px; }
+.nr-typeahead-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 14px; background: #fff; border: none; border-bottom: 1px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
+.nr-typeahead-item:last-child { border-bottom: none; }
+.nr-typeahead-item:hover { background: var(--cheese-tint); }
+.nr-typeahead-freq { font-size: 11px; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
 .nr-member-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .nr-member-chip { display: flex; align-items: center; gap: 6px; border: 2px solid var(--line); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .nr-mini { min-width: 30px; height: 30px; border: 2px solid var(--line); border-radius: 50%; background: #fff; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; font-family: inherit; color: var(--ink); transition: all 0.12s ease; }
