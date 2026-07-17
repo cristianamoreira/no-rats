@@ -30,3 +30,14 @@ dist/
 
 # Supabase CLI
 frontend/supabase/.temp/
+
+# iOS / Xcode (Capacitor)
+frontend/ios/DerivedData/
+**/xcuserdata/
+**/*.xcuserstate
+**/project.xcworkspace/xcshareddata/swiftpm/
+**/Pods/
+
+# Duplicatas do Finder / iCloud ("arquivo 2.ext")
+* 2.*
+* 2
