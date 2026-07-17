@@ -5,10 +5,12 @@ import { uploadCheckinPhoto } from '../lib/storage'
 export default function CheckinModal({ routine, householdId, showToast, onConfirm, onClose }) {
   const [photos, setPhotos] = useState([]) // URLs públicas já enviadas ao Storage
   const [busy, setBusy] = useState(0) // uploads em andamento
+  const [error, setError] = useState('')
 
   const addPhotos = async (e) => {
     const files = Array.from(e.target.files || [])
     e.target.value = ''
+    if (files.length) setError('')
     for (const f of files) {
       setBusy((n) => n + 1)
       try {
@@ -16,7 +18,11 @@ export default function CheckinModal({ routine, householdId, showToast, onConfir
         const url = await uploadCheckinPhoto(householdId, routine.id, blob)
         setPhotos((p) => [...p, url])
       } catch (err) {
-        showToast && showToast('⚠️ ' + (err.message || 'Não consegui enviar a foto. Tente de novo.'))
+        // eslint-disable-next-line no-console
+        console.error('[checkin] falha ao adicionar foto:', err)
+        const msg = (err && err.message) || 'Não consegui adicionar a foto. Tente de novo.'
+        setError(msg)
+        showToast && showToast('⚠️ ' + msg)
       } finally {
         setBusy((n) => n - 1)
       }
@@ -31,6 +37,11 @@ export default function CheckinModal({ routine, householdId, showToast, onConfir
       <div className="nr-modal" onClick={(e) => e.stopPropagation()}>
         <h3 className="nr-h" style={{ marginBottom: '4px' }}>📸 Check-in</h3>
         <div className="nr-meta" style={{ marginBottom: '16px' }}>{routine.title} — adicione ao menos uma foto para concluir.</div>
+        {error && (
+          <div className="nr-auth-msg" style={{ marginBottom: '14px', background: 'var(--red-tint)', borderColor: '#F1B0B2', color: '#B4232A' }}>
+            {error}
+          </div>
+        )}
         <div className="nr-photo-grid">
           {photos.map((src, i) => (
             <div className="nr-photo-thumb" key={i}>
@@ -40,7 +51,7 @@ export default function CheckinModal({ routine, householdId, showToast, onConfir
           ))}
           <label className="nr-photo-add" style={uploading ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
             <span>{uploading ? '⏳' : '＋'}<br />{uploading ? 'Enviando' : 'Foto'}</span>
-            <input type="file" accept="image/*" capture="environment" multiple style={{ display: 'none' }} onChange={addPhotos} disabled={uploading} />
+            <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={addPhotos} disabled={uploading} />
           </label>
         </div>
         <div className="nr-modal-actions">
