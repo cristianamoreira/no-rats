@@ -43,60 +43,70 @@ Deno.serve(async (req) => {
     const pw = periodWindow(period, today)
 
     // Casas com ao menos uma inscrição de push.
-    const { data: subRows } = await admin.from("push_subscriptions").select("household_id")
+    const { data: subRows, error: subRowsErr } = await admin.from("push_subscriptions").select("household_id")
+    if (subRowsErr) return json({ error: "falha ao ler inscrições: " + subRowsErr.message }, 500)
     const householdIds = [...new Set((subRows || []).map((r: any) => r.household_id))]
 
     const stale: string[] = []
     let pushesEnviados = 0
     let casasAnunciadas = 0
 
-    for (const hid of householdIds) {
-      const { data: hh } = await admin.from("households").select("data").eq("id", hid).maybeSingle()
-      const data = (hh?.data || {}) as { members?: Member[]; log?: LogEntry[] }
-      const members = data.members || []
-      const log = data.log || []
-      const { winners } = computeWinners(members, log, pw.inPeriod)
-
-      // Dedupe: insere o registro do período; se já existia, pula a casa.
-      const { data: inserted } = await admin
-        .from("winner_announcements")
-        .upsert(
-          { household_id: hid, period_type: period, period_key: pw.key, winner_ids: winners.map((w) => w.id) },
-          { onConflict: "household_id,period_type,period_key", ignoreDuplicates: true },
-        )
-        .select()
-      if (!inserted || inserted.length === 0) continue // já anunciado
-      casasAnunciadas++
-
-      // Inscrições da casa.
-      const { data: subs } = await admin
-        .from("push_subscriptions")
-        .select("id, user_id, subscription")
-        .eq("household_id", hid)
-      const subList = subs || []
-      if (subList.length === 0) continue
-
-      const send = async (sub: any, title: string, body: string) => {
-        try {
-          await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, url: URL_APP }))
-          pushesEnviados++
-        } catch (err: any) {
-          const code = err?.statusCode
-          if (code === 404 || code === 410) stale.push(sub.id)
-        }
+    const send = async (sub: any, title: string, body: string) => {
+      try {
+        await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, url: URL_APP }))
+        pushesEnviados++
+      } catch (err: any) {
+        const code = err?.statusCode
+        if (code === 404 || code === 410) stale.push(sub.id)
       }
+    }
 
-      if (winners.length === 0) {
-        // Ninguém pontuou: piada do rato para todos.
-        await Promise.all(subList.map((s: any) => send(s, "No Rats 🐀", ratBody(period))))
-      } else {
-        // Um push por vencedor, em sequência (estilo Gym Rats).
-        for (const w of winners) {
-          await Promise.all(subList.map((s: any) => {
-            const body = s.user_id === w.userId ? winnerBodySelf(period) : winnerBodyOther(period, w.name)
-            return send(s, "No Rats 🏆", body)
-          }))
+    for (const hid of householdIds) {
+      // Cada casa é isolada: um erro numa não aborta o lote inteiro.
+      try {
+        const { data: hh, error: hhErr } = await admin.from("households").select("data").eq("id", hid).maybeSingle()
+        if (hhErr) { console.error("[winners] leitura da casa falhou", hid, hhErr.message); continue }
+        const data = (hh?.data || {}) as { members?: Member[]; log?: LogEntry[] }
+        const members = data.members || []
+        const log = data.log || []
+        const { winners } = computeWinners(members, log, pw.inPeriod)
+
+        // Dedupe: insere o registro do período; se já existia, pula a casa.
+        const { data: inserted, error: insErr } = await admin
+          .from("winner_announcements")
+          .upsert(
+            { household_id: hid, period_type: period, period_key: pw.key, winner_ids: winners.map((w) => w.id) },
+            { onConflict: "household_id,period_type,period_key", ignoreDuplicates: true },
+          )
+          .select()
+        if (insErr) { console.error("[winners] dedupe upsert falhou", hid, insErr.message); continue }
+        if (!inserted || inserted.length === 0) continue // já anunciado
+        casasAnunciadas++
+
+        // Inscrições da casa.
+        const { data: subs, error: subsErr } = await admin
+          .from("push_subscriptions")
+          .select("id, user_id, subscription")
+          .eq("household_id", hid)
+        if (subsErr) { console.error("[winners] leitura de inscrições falhou", hid, subsErr.message); continue }
+        const subList = subs || []
+        if (subList.length === 0) continue
+
+        if (winners.length === 0) {
+          // Ninguém pontuou: piada do rato para todos.
+          await Promise.all(subList.map((s: any) => send(s, "No Rats 🐀", ratBody(period))))
+        } else {
+          // Um push por vencedor, em sequência (estilo Gym Rats).
+          for (const w of winners) {
+            await Promise.all(subList.map((s: any) => {
+              const body = s.user_id === w.userId ? winnerBodySelf(period) : winnerBodyOther(period, w.name)
+              return send(s, "No Rats 🏆", body)
+            }))
+          }
         }
+      } catch (e) {
+        console.error("[winners] falha ao processar casa", hid, String(e))
+        continue
       }
     }
 
