@@ -1,0 +1,33 @@
+name: Push de vencedores (semana/mês)
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'   # toda segunda 11:00 UTC (~08h BRT) — semana
+    - cron: '0 11 1 * *'   # todo dia 1º 11:00 UTC (~08h BRT) — mês
+  workflow_dispatch:
+    inputs:
+      period:
+        description: 'Testar manualmente: week, month ou both'
+        default: 'both'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar notify-winners
+        env:
+          FN_URL: https://drhhimvxtqrvuumqhkgr.supabase.co/functions/v1/notify-winners
+          CRON_SECRET: ${{ secrets.NORATS_CRON_SECRET }}
+          PERIOD: ${{ github.event.inputs.period || 'both' }}
+        run: |
+          set -euo pipefail
+          call() {
+            echo "== período: $1 =="
+            curl -fsS -X POST "$FN_URL" \
+              -H "x-cron-secret: $CRON_SECRET" \
+              -H "Content-Type: application/json" \
+              -d "{\"period\":\"$1\"}"
+            echo
+          }
+          if [ "$PERIOD" = "both" ] || [ "$PERIOD" = "week" ]; then call week; fi
+          if [ "$PERIOD" = "both" ] || [ "$PERIOD" = "month" ]; then call month; fi
