@@ -106,3 +106,21 @@ with check (
 --    - own membership select         (SELECT, USING: auth.uid() = user_id)
 --    - own membership delete         (DELETE, USING: auth.uid() = user_id)
 --    - (INSERT apenas via create_household / join_household)
+
+
+-- ============================================================================
+-- BLOCO D — Registro/dedupe dos anúncios de vencedor (aplicar 1x no SQL Editor)
+-- ============================================================================
+-- Usado pela Edge Function notify-winners para não anunciar o mesmo período duas
+-- vezes e para guardar quem venceu. Só a função (service role) acessa.
+
+create table if not exists public.winner_announcements (
+  household_id uuid not null,
+  period_type  text not null check (period_type in ('week','month')),
+  period_key   text not null,
+  winner_ids   jsonb not null default '[]',
+  created_at   timestamptz not null default now(),
+  primary key (household_id, period_type, period_key)
+);
+alter table public.winner_announcements enable row level security;
+-- Sem policies: clientes ficam bloqueados; a Edge Function usa service role.
