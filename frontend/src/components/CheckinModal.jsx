@@ -49,10 +49,24 @@ export default function CheckinModal({ routine, householdId, showToast, onConfir
               <button className="nr-photo-del" onClick={() => removeAt(i)} aria-label="Remover foto">✕</button>
             </div>
           ))}
-          <label className="nr-photo-add" style={uploading ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-            <span>{uploading ? '⏳' : '＋'}<br />{uploading ? 'Enviando' : 'Foto'}</span>
-            <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={addPhotos} disabled={uploading} />
-          </label>
+          {uploading ? (
+            <div className="nr-photo-add" style={{ opacity: 0.6 }}>
+              <span>⏳<br />Enviando</span>
+            </div>
+          ) : (
+            <>
+              {/* Câmera: capture abre a câmera na hora (single). */}
+              <label className="nr-photo-add">
+                <span>📷<br />Tirar</span>
+                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={addPhotos} />
+              </label>
+              {/* Galeria: sem capture, permite várias e é a alternativa confiável. */}
+              <label className="nr-photo-add">
+                <span>🖼️<br />Galeria</span>
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={addPhotos} />
+              </label>
+            </>
+          )}
         </div>
         <div className="nr-modal-actions">
           <button className="nr-btn nr-del" onClick={onClose}>Cancelar</button>
