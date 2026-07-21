@@ -11,6 +11,7 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [pending, setPending] = useState(false) // conta aguardando confirmação por e-mail
+  const [showPw, setShowPw] = useState(false)
 
   const submit = async () => {
     if (mode === 'signup' && !name.trim()) return setMsg('Digite seu nome.')
@@ -82,7 +83,18 @@ export default function AuthScreen() {
             <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="text" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
           )}
           <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="email" placeholder="Seu email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="nr-input" style={{ width: '100%', marginBottom: '10px' }} type="password" placeholder="Senha (mín. 6 caracteres)" value={pw} onChange={(e) => setPw(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && submit()} />
+          <div style={{ position: 'relative', marginBottom: '10px' }}>
+            <input className="nr-input" style={{ width: '100%', paddingRight: '46px' }} type={showPw ? 'text' : 'password'} placeholder="Senha (mín. 6 caracteres)" value={pw} onChange={(e) => setPw(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && submit()} />
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}
+              title={showPw ? 'Ocultar senha' : 'Mostrar senha'}
+              style={{ position: 'absolute', top: '50%', right: '8px', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '6px' }}
+            >
+              {showPw ? '🙈' : '👁️'}
+            </button>
+          </div>
           {msg && <div className="nr-auth-msg">{msg}</div>}
           <button className="nr-btn nr-btn-primary" style={{ width: '100%', marginTop: '6px' }} onClick={submit} disabled={busy}>
             {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar no jogo' : 'Criar minha conta'}
