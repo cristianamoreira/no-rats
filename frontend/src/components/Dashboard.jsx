@@ -21,6 +21,8 @@ export default function Dashboard({ hh, showToast }) {
   const routines = data.routines
   const log = data.log
   const isLeader = me && me.id === leaderId
+  // Pode criar tarefas: o líder sempre; os demais só se o líder tiver liberado.
+  const canCreate = isLeader || (me && me.canCreate)
 
   return (
     <div className="nr-app">
@@ -60,11 +62,12 @@ export default function Dashboard({ hh, showToast }) {
             houseCode={houseCode}
             onRemoveMember={hh.removeMember}
             onMakeLeader={hh.makeLeader}
+            onToggleCanCreate={hh.toggleCanCreate}
             showToast={showToast}
           />
         )}
 
-        {isLeader && (
+        {canCreate && (
           <NewRoutinePanel members={members} routines={routines} onAdd={hh.addRoutine} />
         )}
 

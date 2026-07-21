@@ -186,6 +186,16 @@ export function useHousehold(session, showToast) {
     showToast('👑 Novo líder da família!')
   }
 
+  // Líder libera/bloqueia um membro para criar tarefas.
+  const toggleCanCreate = (id) => {
+    setData((p) => {
+      const members = p.members.map((m) => (m.id === id ? { ...m, canCreate: !m.canCreate } : m))
+      const t = members.find((m) => m.id === id)
+      showToast(t && t.canCreate ? `✏️ ${t.name} já pode criar tarefas` : `🚫 ${t ? t.name : 'Membro'} não cria mais tarefas`)
+      return { ...p, members }
+    })
+  }
+
   const addRoutine = ({ title, freq, xp, ownerId, customDays }) => {
     const t = (title || '').trim()
     if (!t) return showToast('✏️ Dê um nome para a rotina!')
@@ -291,6 +301,7 @@ export function useHousehold(session, showToast) {
     logout,
     removeMember,
     makeLeader,
+    toggleCanCreate,
     addRoutine,
     completeTask,
     updateFreq,

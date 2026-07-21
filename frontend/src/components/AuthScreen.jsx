@@ -90,9 +90,22 @@ export default function AuthScreen() {
               onClick={() => setShowPw((v) => !v)}
               aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}
               title={showPw ? 'Ocultar senha' : 'Mostrar senha'}
-              style={{ position: 'absolute', top: '50%', right: '8px', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '6px' }}
+              style={{ position: 'absolute', top: '50%', right: '8px', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 0, padding: '6px', color: '#888' }}
             >
-              {showPw ? '🙈' : '👁️'}
+              {showPw ? (
+                // olho aberto — senha visível
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              ) : (
+                // olho fechado (riscado) — senha secreta
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 8 10 8a9.12 9.12 0 0 0 5.39-1.61" />
+                  <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
+                  <line x1="2" y1="2" x2="22" y2="22" />
+                </svg>
+              )}
             </button>
           </div>
           {msg && <div className="nr-auth-msg">{msg}</div>}

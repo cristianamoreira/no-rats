@@ -124,3 +124,112 @@ create table if not exists public.winner_announcements (
 );
 alter table public.winner_announcements enable row level security;
 -- Sem policies: clientes ficam bloqueados; a Edge Function usa service role.
+
+
+-- ============================================================================
+-- BLOCO E — Permissão de criar tarefas no backend (aplicar 1x no SQL Editor)
+-- ============================================================================
+-- Contexto: o estado inteiro da casa vive em households.data (jsonb) e qualquer
+-- MEMBRO pode dar UPDATE (precisa, pra concluir tarefa, desfazer, etc.). A RLS
+-- sozinha não distingue "concluiu uma tarefa" de "criou uma tarefa nova". Este
+-- trigger BEFORE UPDATE compara o data ANTIGO com o NOVO e recusa apenas as
+-- mudanças que violam o modelo de permissão, deixando o resto passar:
+--
+--   * Criar tarefa nova  -> só o líder OU um membro com canCreate = true.
+--   * Editar/remover tarefa existente (título, freq, xp, dias, dono) -> só líder.
+--     (campos de execução — lastDone/lastDoneBy/penalized — mudam para todos.)
+--   * Transferir liderança (leaderId) -> só o líder.
+--   * Alterar a permissão canCreate de alguém -> só o líder.
+--
+-- O "quem sou eu" é lido do estado ANTIGO (OLD.data), então ninguém consegue se
+-- autopromover e usar o poder novo na MESMA escrita.
+
+create or replace function public.enforce_routine_permissions()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  actor_id text;
+  can_create boolean := false;
+  is_leader boolean := false;
+  added int;
+  removed int;
+  edited int;
+  cancreate_tampered int;
+begin
+  -- Sem contexto de usuário (ex.: service role / Edge Functions): não interfere.
+  if uid is null then
+    return new;
+  end if;
+
+  -- Identifica o membro que está escrevendo, a partir do estado ANTIGO.
+  select m->>'id', coalesce((m->>'canCreate')::boolean, false)
+    into actor_id, can_create
+  from jsonb_array_elements(coalesce(old.data->'members', '[]'::jsonb)) m
+  where m->>'userId' = uid::text
+  limit 1;
+
+  is_leader := actor_id is not null and actor_id = (old.data->>'leaderId');
+
+  -- Tarefas ADICIONADAS (ids que aparecem no NOVO e não existiam no ANTIGO).
+  select count(*) into added
+  from jsonb_array_elements(coalesce(new.data->'routines', '[]'::jsonb)) n
+  where not exists (
+    select 1 from jsonb_array_elements(coalesce(old.data->'routines', '[]'::jsonb)) o
+    where o->>'id' = n->>'id'
+  );
+
+  -- Tarefas REMOVIDAS (ids que existiam no ANTIGO e sumiram no NOVO).
+  select count(*) into removed
+  from jsonb_array_elements(coalesce(old.data->'routines', '[]'::jsonb)) o
+  where not exists (
+    select 1 from jsonb_array_elements(coalesce(new.data->'routines', '[]'::jsonb)) n
+    where n->>'id' = o->>'id'
+  );
+
+  -- Tarefas EDITADAS na definição (ignora os campos de execução).
+  select count(*) into edited
+  from jsonb_array_elements(coalesce(new.data->'routines', '[]'::jsonb)) n
+  join jsonb_array_elements(coalesce(old.data->'routines', '[]'::jsonb)) o
+    on o->>'id' = n->>'id'
+  where jsonb_build_object('title', n->'title', 'freq', n->'freq', 'xp', n->'xp',
+                           'customDays', n->'customDays', 'ownerId', n->'ownerId')
+    is distinct from
+        jsonb_build_object('title', o->'title', 'freq', o->'freq', 'xp', o->'xp',
+                           'customDays', o->'customDays', 'ownerId', o->'ownerId');
+
+  if added > 0 and not (is_leader or can_create) then
+    raise exception 'Sem permissão para criar tarefas nesta casa';
+  end if;
+
+  if (removed > 0 or edited > 0) and not is_leader then
+    raise exception 'Só o líder pode editar ou remover tarefas';
+  end if;
+
+  -- Transferência de liderança: só o líder atual.
+  if (old.data->>'leaderId') is distinct from (new.data->>'leaderId') and not is_leader then
+    raise exception 'Só o líder pode transferir a liderança';
+  end if;
+
+  -- Alterar a permissão canCreate de qualquer membro: só o líder.
+  select count(*) into cancreate_tampered
+  from jsonb_array_elements(coalesce(old.data->'members', '[]'::jsonb)) o
+  join jsonb_array_elements(coalesce(new.data->'members', '[]'::jsonb)) n
+    on o->>'id' = n->>'id'
+  where coalesce((o->>'canCreate')::boolean, false)
+    is distinct from coalesce((n->>'canCreate')::boolean, false);
+
+  if cancreate_tampered > 0 and not is_leader then
+    raise exception 'Só o líder pode alterar permissões';
+  end if;
+
+  return new;
+end; $$;
+
+drop trigger if exists trg_enforce_routine_permissions on public.households;
+create trigger trg_enforce_routine_permissions
+  before update on public.households
+  for each row execute function public.enforce_routine_permissions();
