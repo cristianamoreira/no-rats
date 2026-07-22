@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { traduz } from '../lib/errors'
+import { resetRedirectTo } from '../lib/authRedirect'
 import RatLogo from './RatLogo'
 
 export default function AuthScreen() {
@@ -40,6 +41,18 @@ export default function AuthScreen() {
         setPending(true)
       }
     }
+    setBusy(false)
+  }
+
+  const forgotPw = async () => {
+    if (!email.trim()) return setMsg('Digite o email da conta para recuperar a senha.')
+    setBusy(true)
+    setMsg('')
+    setPending(false)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: resetRedirectTo(),
+    })
+    setMsg(error ? traduz(error.message) : '📧 Enviamos um link para redefinir sua senha. Confira a caixa de entrada e o spam.')
     setBusy(false)
   }
 
@@ -115,6 +128,11 @@ export default function AuthScreen() {
           {pending && (
             <button className="nr-linkbtn" onClick={resend} disabled={busy} style={{ display: 'block' }}>
               Reenviar e-mail de confirmação
+            </button>
+          )}
+          {mode === 'login' && (
+            <button className="nr-linkbtn" onClick={forgotPw} disabled={busy} style={{ display: 'block' }}>
+              Esqueceu sua senha?
             </button>
           )}
           <button className="nr-linkbtn" onClick={toggleMode}>
