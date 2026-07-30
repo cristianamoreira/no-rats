@@ -3,6 +3,7 @@ import { useToast } from './hooks/useToast'
 import { useAuth } from './hooks/useAuth'
 import { useHousehold } from './hooks/useHousehold'
 import AuthScreen from './components/AuthScreen'
+import ResetPasswordScreen from './components/ResetPasswordScreen'
 import HouseholdSetup from './components/HouseholdSetup'
 import Dashboard from './components/Dashboard'
 import Toast from './components/Toast'
@@ -25,7 +26,7 @@ function readInviteCode() {
 
 export default function App() {
   const { toast, showToast } = useToast()
-  const { session, authReady } = useAuth()
+  const { session, authReady, recovery, clearRecovery } = useAuth()
   const hh = useHousehold(session, showToast)
   const [inviteCode] = useState(readInviteCode)
 
@@ -36,7 +37,11 @@ export default function App() {
   }, [hh.householdId])
 
   let screen
-  if (!authReady || hh.loading) {
+  if (!authReady) {
+    screen = <div className="nr-auth"><div className="nr-spinner">🐭 Carregando…</div></div>
+  } else if (recovery) {
+    screen = <ResetPasswordScreen onDone={clearRecovery} />
+  } else if (hh.loading) {
     screen = <div className="nr-auth"><div className="nr-spinner">🐭 Carregando…</div></div>
   } else if (!session) {
     screen = <AuthScreen />
