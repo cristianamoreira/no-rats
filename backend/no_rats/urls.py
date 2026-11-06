@@ -16,8 +16,17 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+
+from gamification.views import AchievementViewSet, UserAchievementViewSet
+
+# Initialize router for achievement endpoints
+router = DefaultRouter()
+router.register('achievements', AchievementViewSet, basename='achievement')
+router.register('user/achievements', UserAchievementViewSet, basename='user-achievement')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/", include(router.urls)),
 ]
